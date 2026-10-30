@@ -1,0 +1,62 @@
+microgrid- local electrical system- kinda like a local grid.
+fetch electricity data for the past year at least OR the past month if tight on token usage.
+use it to come up with a mathematical model of the peak usage times, rates, demand, etc, and find patterns in it.
+find which pattern corresponds to the cheapest cost and least demand.
+let: pattern found, frequency: daily. then overlap this time frame with grid usage.
+let there be a budget limit for grid usage. then pull max optimized power from the grid as follows:
+let there be a unified big reservoir for the incoming grid power. this will act as a big buffer. its capacity and specifics will be optimized later. rn its a conceptual obj.
+then let a_i be different forms of energy that can be semantically and intuitively thought of as being subsets of E in some parameter.
+then instead of directing all incoming grid power to the main reservoir we can redirect it directly to the reservoir OF the closest a_i that its gonna be used for.
+downsides: energy is still going to be lost. for exmaple: thermal reservoir loses heat, caprs self discharge, batteries degrade over time.
+"peak grid power": at a given time range t, it is the maximum power pulled from the microgrid-grid system- ex: solar power is down, so the reservoir is being used by everyone for EVs, AC systems, machines, etc.
+physicist approach- model the simplest possible model of the problem and solve it first. then add on additional functionality.
+main metrics: price (to min), physical damage (to min), critical load uptime (to max, 100%) 
+
+
+
+Simplest Model:
+Setup{
+1 House, 1 solar panel, 1 connection to grid, 1 EV charger, 1 battery (unified reservoir for this system), suitable plausible and simplest arbitrary N number of household appliances represented by x_i.
+Each appliance has a priority rating bel [0,100] ∩ W.
+}
+
+Current core ideas:
+
+
+1. E consumption equation must be something like: 
+E_available(t) - ∑ E_(α_i x_i)  = E_crit(t)+E_crit_buffer(arbitrary) -> Baseline condition.
+If LHS > RHS, LHS-RHS goes to reservoirs.
+E_available is a piecewise function of time which may or may not be parametric, and serves as the available incoming energy. It can be solar+grid, only grid, or only solar, depending on certain conditions.
+Using a linear combination approach where α_i is the respective priority score of each x_i, where x_i is the i'th household appliance. So α_i is the weight.
+SO E_(α_i x_i) means energy consumption of appliance x_i with its respective priority score α_i.
+x_i does NOT include the critical loads.
+E_crit(t) is an arbitrary function of time (and it also has the possibility to be a constant for simpler conditions and approximations).
+E_crit(t) is the resultant energy consumption required by the critical loads.
+E_crit_buffer(t) is a function of some suitable parameter(s). could be piecewise and parametric in its parameters.
+
+
+2. Luxury thresholds:
+First:
+E_in = E_consumed
+Why- Because below this thershold, we would be effectively disregarding the lowest priority appliances.
+So, to have all appliances have exactly enough E_in to consume is the first luxury.
+
+Second:
+E_in > E_consumed -> slightly >, where E_in-E_cons=E_Conceptual_Reservoir_Buffer
+E_Conceptual_Reservoir_Buffer is a conceptual buffer which in reality, encompasses the distribution of E_in-E_consumed among all reservoirs according to the algorithm.
+
+Third:
+E_in >> E_consumed
+
+
+
+
+
+
+
+Current non-core ideas:
+
+
+1. Implement a unit conversion tool or let the AI agent auto-convert. check plausibility, optimization, feasibility, accuracy, and reliability of the AI agent route.
+Currently preferred and potentially optimal route is to convert all units into the unit the AI agent is working with, locally, within the program.
+There is no need to make this unit conversion module a tool for the AI agent, since that could increase token usage. It is much better to handle it locally.

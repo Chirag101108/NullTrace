@@ -1,0 +1,8 @@
+#1- 03- CT sesh auth- 83/100
+#2- 02- ID verifier- 74/100, +: cybersec related, chirag can carry, -: impressiveness might not be optimal. 
+#3- 01- Outage detector- 70/100, +: rel easier, -: might be common and not impressive.
+#4- 04- Deepfake detector- 63/100, +:doable if APIs and opensource tools suffice to present a satisfactory working project. -: more complex if we want to implement even a part of the solution ourselves
+#5- 05- microgrid E scheduler- 60/100, +: my electrochem knowledge , -: implementation and data source availability (mainly for i*dia).
+#6- 06- Virtual City Simulation Engine- 40/100, -: might be unnecessarily complicated and physics-heavy and despite that, a feasible working model given the current conditions wont be impressive
+
+My work: 05- microgrid energy scheduler.
