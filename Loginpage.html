@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07110d">
+  <title>Sign in · Grid System</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 30px; color: #f5f8f5; background: radial-gradient(ellipse at 13% 15%, #16351f 0, transparent 35%), radial-gradient(ellipse at 88% 82%, #102c23 0, transparent 32%), #07110d; }
+    .shell { width: min(100%, 1040px); min-height: 610px; display: grid; grid-template-columns: 1.05fr .95fr; overflow: hidden; border: 1px solid #24382b; border-radius: 26px; background: #0b1510; box-shadow: 0 32px 100px #0008; }
+    .brand { position: relative; display: flex; flex-direction: column; justify-content: space-between; padding: 38px; background: linear-gradient(150deg, #0b1710, #101b13 60%, #0d1811); }
+    .eyebrow { display: flex; align-items: center; gap: 10px; color: #9bad9d; font-size: 11px; font-weight: 700; letter-spacing: .19em; text-transform: uppercase; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #68e34a; box-shadow: 0 0 14px #68e34a; }
+    .team-logo { width: min(100%, 330px); aspect-ratio: 1; align-self: center; object-fit: contain; mix-blend-mode: screen; }
+    .brand-copy { max-width: 360px; }
+    .brand-copy h1 { margin: 0 0 10px; font-size: clamp(29px, 4vw, 43px); line-height: 1.08; letter-spacing: -.045em; }
+    .brand-copy h1 span { color: #70df4a; }
+    .brand-copy p { margin: 0; color: #9aaca0; font-size: 14px; line-height: 1.65; }
+    .product-mark { position: absolute; top: 33px; right: 34px; width: 58px; height: 58px; overflow: hidden; border-radius: 15px; background: #fff; }
+    .product-mark img { width: 100%; height: 100%; object-fit: cover; }
+    .form-side { display: grid; align-content: center; padding: clamp(32px, 6vw, 68px); background: #0c1711; }
+    .form-inner { width: 100%; max-width: 360px; margin: 0 auto; }
+    .lock { width: 43px; height: 43px; display: grid; place-items: center; margin-bottom: 28px; border: 1px solid #294331; border-radius: 13px; color: #80e95e; background: #14251a; }
+    .lock svg { width: 21px; height: 21px; }
+    .form-inner h2 { margin: 0; font-size: 30px; letter-spacing: -.04em; }
+    .intro { margin: 9px 0 31px; color: #91a296; font-size: 14px; line-height: 1.6; }
+    label { display: block; margin: 19px 0 8px; color: #d4ded6; font-size: 13px; font-weight: 600; }
+    input { width: 100%; height: 48px; padding: 0 14px; border: 1px solid #2a3a2f; border-radius: 10px; outline: none; color: #f5f8f5; background: #0a120d; font: inherit; transition: border-color .15s, box-shadow .15s; }
+    input::placeholder { color: #65756a; }
+    input:focus { border-color: #69db4b; box-shadow: 0 0 0 3px #69db4b20; }
+    button { width: 100%; height: 49px; margin-top: 26px; border: 0; border-radius: 10px; color: #07110d; background: linear-gradient(100deg, #86ee58, #59d346); font: inherit; font-weight: 750; cursor: pointer; transition: filter .15s, transform .15s; }
+    button:hover { filter: brightness(1.06); transform: translateY(-1px); }
+    .error { margin: 16px 0 -8px; padding: 11px 13px; border: 1px solid #633b37; border-radius: 9px; color: #ffb3a9; background: #351d1b; font-size: 13px; }
+    .foot { margin: 25px 0 0; color: #718176; font-size: 12px; text-align: center; }
+    @media (max-width: 720px) { body { padding: 14px; } .shell { grid-template-columns: 1fr; min-height: auto; } .brand { min-height: 250px; padding: 25px; } .team-logo { position: absolute; right: 22px; bottom: 15px; width: 165px; opacity: .72; } .brand-copy { position: relative; z-index: 1; max-width: 260px; } .brand-copy h1 { font-size: 30px; } .product-mark { top: 20px; right: 20px; width: 44px; height: 44px; } .form-side { padding: 36px 25px 30px; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="brand" aria-label="Null Trace team and Grid System product">
+      <div class="eyebrow"><span class="dot"></span> Energy intelligence platform</div>
+      <img class="team-logo" src="/team-logo.png" alt="Null Trace team logo">
+      <div class="brand-copy"><h1>Smarter energy.<br><span>Stronger grids.</span></h1><p>Grid System is the microgrid optimization platform by Null Trace.</p></div>
+      <div class="product-mark"><img src="/product-logo.png" alt="Grid System energy network logo"></div>
+    </section>
+    <section class="form-side">
+      <div class="form-inner">
+        <div class="lock" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 1 1 8 0v3M12 14v3"/></svg></div>
+        <h2>Welcome back</h2>
+        <p class="intro">Sign in with your administrator account to continue to Grid System.</p>
+        <form action="/login" method="post">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" autocomplete="username" placeholder="Enter your username" required autofocus>
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+          {{ERROR}}
+          <button type="submit">Sign in <span aria-hidden="true">→</span></button>
+        </form>
+        <p class="foot">Authorized administrators only · Null Trace</p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
