@@ -1,0 +1,8 @@
+{
+  "name": "null-trace-grid-system",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Local sign-up and sign-in for Grid System by Null Trace",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}
