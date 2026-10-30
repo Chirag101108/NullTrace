@@ -23,7 +23,8 @@ class GeminiAgent:
             raise AgentError("GEMINI_API_KEY is not set")
 
     def _generate_text(self, system_instruction: str, payload: dict,
-                       max_output_tokens: int = 1600) -> str:
+                       max_output_tokens: int = 1600,
+                       response_schema: dict | None = None) -> str:
         # Interactions is Google's recommended API primitive for agentic workflows.
         url = "https://generativelanguage.googleapis.com/v1beta/interactions"
         prompt = (
@@ -40,6 +41,12 @@ class GeminiAgent:
             },
             "store": False,
         }
+        if response_schema is not None:
+            body["response_format"] = {
+                "type": "text",
+                "mime_type": "application/json",
+                "schema": response_schema,
+            }
         request = urllib.request.Request(
             url, data=json.dumps(body).encode("utf-8"),
             headers={
@@ -84,7 +91,37 @@ class GeminiAgent:
             "parameter_updates (object), surplus_policy (object or null), reason (string), "
             "stop_reason (string)."
         )
-        text = self._generate_text(instruction, payload, max_output_tokens=1200)
+        decision_schema = {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["continue", "stop"]},
+                "parameter_updates": {
+                    "type": "object",
+                    "properties": {
+                        "peak_penalty": {"type": "number"},
+                        "curtailment_penalty": {"type": "number"},
+                        "flex_risk_penalty": {"type": "number"},
+                        "shedding_scale": {"type": "number"},
+                    },
+                    "required": [],
+                },
+                "surplus_policy": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "store_pct": {"type": "number"},
+                        "export_pct": {"type": "number"},
+                    },
+                    "required": ["store_pct", "export_pct"],
+                },
+                "reason": {"type": "string"},
+                "stop_reason": {"type": "string"},
+            },
+            "required": ["action", "parameter_updates", "surplus_policy", "reason", "stop_reason"],
+        }
+        text = self._generate_text(
+            instruction, payload, max_output_tokens=1200,
+            response_schema=decision_schema,
+        )
         try:
             result = json.loads(text)
         except json.JSONDecodeError as exc:
@@ -106,6 +143,11 @@ class GeminiAgent:
             instruction,
             {"report_request": "Generate the final technical report.", "final_context": payload},
             max_output_tokens=2600,
+            response_schema={
+                "type": "object",
+                "properties": {"report": {"type": "string"}},
+                "required": ["report"],
+            },
         )
         try:
             result = json.loads(text)

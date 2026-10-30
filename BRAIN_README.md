@@ -18,7 +18,7 @@ pip install -r requirements.txt
 ```bash
 python main.py run --agent mock --max-iterations 2
 ```
-Gemini is called through Google's Interactions API using the `gemini-3.8-flash` model by default. The API key is sent in the request header; request storage is disabled.\n\nThe mock agent exercises the full loop without API credits. It is explicitly not Gemini reasoning.
+Gemini is called through Google's Interactions API using the `gemini-3.8-flash` model by default. The API key is sent in the request header, request storage is disabled, and Gemini responses use a JSON schema before local validation. The mock agent exercises the full loop without API credits; it is explicitly not Gemini reasoning.
 
 ## Run with Gemini
 ```bash
@@ -33,6 +33,8 @@ python main.py run --agent gemini --max-iterations 3
 ```bash
 python main.py serve --host 127.0.0.1 --port 8765
 ```
+Open `index.html` in a browser to use the local run console. It connects to `http://127.0.0.1:8765` by default. To use another API address, add `?api=http://127.0.0.1:PORT` to the page URL.
+
 Endpoints:
 - `GET /api/health`
 - `POST /api/run` JSON body, e.g. `{"agent":"mock","max_iterations":2}`
