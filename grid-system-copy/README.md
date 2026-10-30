@@ -66,6 +66,6 @@ To send people somewhere else after sign-in, change the `redirect:` URL in `hand
 
 ## Run the microgrid optimizer
 
-Start the brain API from the repository root with `python main.py serve`. Then start this frontend with `npm start` and open http://127.0.0.1:3000. The dashboard sends runs to `http://127.0.0.1:8765`; the browser needs both local servers running. Choose **Mock (offline)** to run without a Gemini API key, or **Automatic** to use Gemini when `GEMINI_API_KEY` is configured and otherwise use the mock agent.
+From the repository root, start both services with `bash start_local.sh`. The brain API defaults to `127.0.0.1:8765`; this frontend defaults to `127.0.0.1:3000`. The launcher rejects a port collision and prints the frontend URL. Set `AFTERHOURS_API_PORT` and `AFTERHOURS_FRONTEND_PORT` to choose different ports; the API URL, frontend security policy, and dashboard client are configured together. Use the `grid-system-copy` frontend for the optimizer dashboard. Choose **Mock (offline)** to run without a Gemini API key, or **Automatic** to use Gemini when `GEMINI_API_KEY` is configured and otherwise use the mock agent.
 
 This is a local app. Don't put it on the internet as-is (no HTTPS, in-memory sessions).

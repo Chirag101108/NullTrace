@@ -22,6 +22,13 @@ const PUBLIC_DIR = path.join(ROOT, 'public');
 const VIEWS_DIR = path.join(ROOT, 'views');
 const DATA_DIR = path.join(ROOT, '.local-data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const BRAIN_API_URL = new URL(process.env.BRAIN_API_URL || 'http://127.0.0.1:8765');
+if (BRAIN_API_URL.protocol !== 'http:' || BRAIN_API_URL.hostname !== '127.0.0.1'
+    || BRAIN_API_URL.username || BRAIN_API_URL.password
+    || BRAIN_API_URL.pathname !== '/' || BRAIN_API_URL.search || BRAIN_API_URL.hash) {
+  throw new Error('BRAIN_API_URL must be a plain http://127.0.0.1:<port> origin.');
+}
+const BRAIN_API_ORIGIN = BRAIN_API_URL.origin;
 
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, keylen: 64 };
 const SESSION_COOKIE = 'gs_session';
@@ -166,7 +173,7 @@ const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' http://127.0.0.1:8765; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
+  'Content-Security-Policy': `default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' ${BRAIN_API_ORIGIN}; frame-ancestors 'none'; form-action 'self'; base-uri 'none'`
 };
 
 function sendJson(res, status, payload, headers = {}) {
@@ -359,6 +366,16 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method !== 'GET' && req.method !== 'HEAD') return sendJson(res, 405, { error: 'Method not allowed.' });
+
+    if (pathname === '/brain-config.js') {
+      res.writeHead(200, {
+        'Content-Type': 'text/javascript; charset=utf-8',
+        'Cache-Control': 'no-store',
+        ...SECURITY_HEADERS,
+      });
+      return res.end(req.method === 'HEAD' ? undefined
+        : `window.AFTERHOURS_BRAIN_API = ${JSON.stringify(BRAIN_API_ORIGIN)};\n`);
+    }
 
     if (pathname === '/api/me') {
       const user = sessionUser(req);

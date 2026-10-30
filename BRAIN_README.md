@@ -33,7 +33,7 @@ python main.py run --agent gemini --max-iterations 3
 ```bash
 python main.py serve --host 127.0.0.1 --port 8765
 ```
-The teammate's authenticated dashboard is in `grid-system-copy/`. Run it in a second terminal with `cd grid-system-copy && npm start`, then open `http://127.0.0.1:3000`. It connects to `http://127.0.0.1:8765`. The separate root `index.html` is not part of this frontend integration.
+The teammate's authenticated dashboard is in `grid-system-copy/`. From the repository root, run `bash start_local.sh`; it starts the API on `127.0.0.1:8765` and the dashboard on `127.0.0.1:3000`, then prints the URL to open. The `grid-system/` directory is an older auth-only copy; the separate root `index.html` is not part of this frontend integration. Set `AFTERHOURS_API_PORT` and `AFTERHOURS_FRONTEND_PORT` together if you need alternate, distinct ports.
 
 Endpoints:
 - `GET /api/health` returns `status`, `database_exists`, `database_ready`, and any `missing_tables`.

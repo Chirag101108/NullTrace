@@ -1,7 +1,7 @@
 'use strict';
 
 const $ = (id) => document.getElementById(id);
-const BRAIN_API = 'http://127.0.0.1:8765';
+const BRAIN_API = window.AFTERHOURS_BRAIN_API || 'http://127.0.0.1:8765';
 const fmt = (iso) => (iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—');
 const number = (value, unit = '') => Number.isFinite(value) ? `${value.toLocaleString([], { maximumFractionDigits: 2 })}${unit}` : 'Unavailable';
 
