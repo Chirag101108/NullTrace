@@ -166,7 +166,7 @@ const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
+  'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' http://127.0.0.1:8765; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
 };
 
 function sendJson(res, status, payload, headers = {}) {
@@ -302,7 +302,7 @@ async function handleLogin(req, res) {
   failures.delete(throttleKey);
   user.lastLoginAt = new Date().toISOString();
   saveDb().catch((error) => console.error('Could not record last sign-in:', error.message));
-  return sendJson(res, 200, { ok: true, redirect: 'https://www.google.com/', user: publicUser(user) }, { 'Set-Cookie': startSession(res, user) });
+  return sendJson(res, 200, { ok: true, redirect: '/dashboard', user: publicUser(user) }, { 'Set-Cookie': startSession(res, user) });
 }
 
 function handleLogout(req, res) {

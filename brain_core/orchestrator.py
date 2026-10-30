@@ -4,7 +4,7 @@ import json
 import sqlite3
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
 from .protocol import build_snapshot, to_agent_payload, validate_agent_decision
 from .patterns import scan_surplus_patterns
@@ -16,6 +16,7 @@ DEFAULT_PARAMS = {
     "flex_risk_penalty": 300.0,
     "shedding_scale": 1.0,
 }
+CONVERGENCE_PATIENCE = 2
 
 
 def _fixed_reference_score(conn: sqlite3.Connection, run_id: str,
@@ -58,7 +59,8 @@ def run_agentic_workflow(db_path: str, optimizer_module, agent,
                          max_iterations: int = 3,
                          horizon: int | None = None,
                          initial_parameters: dict[str, float] | None = None,
-                         tolerance: float = 1e-5) -> dict[str, Any]:
+                         tolerance: float = 1e-5,
+                         progress_callback: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
     if max_iterations < 1 or max_iterations > 12:
         raise ValueError("max_iterations must be between 1 and 12")
     params = dict(DEFAULT_PARAMS)
@@ -69,6 +71,7 @@ def run_agentic_workflow(db_path: str, optimizer_module, agent,
     patterns = []
     best = None
     best_score = float("inf")
+    stale_iterations = 0
     termination = "iteration_limit"
     decisions = []
     started = datetime.now(timezone.utc).isoformat()
@@ -78,7 +81,7 @@ def run_agentic_workflow(db_path: str, optimizer_module, agent,
     try:
         conn.execute("PRAGMA foreign_keys=ON")
         required = {
-            "interval_summary", "measurement", "battery_state", "dispatch",
+            "interval_summary", "measurement", "weather", "battery_state", "dispatch",
             "battery_degradation_model", "flexibility_declaration",
             "flexibility_verification", "optimization_run", "optimization_result",
             "optimization_constraint_check", "agent_run",
@@ -91,6 +94,9 @@ def run_agentic_workflow(db_path: str, optimizer_module, agent,
             raise RuntimeError("Database is missing required hurdle tables: " + ", ".join(missing))
         patterns = scan_surplus_patterns(conn)
         for iteration in range(1, max_iterations + 1):
+            if progress_callback:
+                progress_callback({"stage": "optimizing", "iteration": iteration,
+                                   "total_iterations": max_iterations})
             run_id = optimizer_module.solve(
                 conn, horizon=horizon,
                 peak_penalty=params["peak_penalty"],
@@ -102,23 +108,31 @@ def run_agentic_workflow(db_path: str, optimizer_module, agent,
             score = _fixed_reference_score(conn, run_id, snapshot, optimizer_module)
             snapshot["comparison_score_fixed_reference"] = score
 
+            improved = score < best_score - tolerance
             candidate_record = {
                 "iteration": iteration,
                 "optimizer_run_id": run_id,
                 "fixed_reference_score": score,
+                "improved_best": improved,
                 "peak_grid_import_kw": snapshot["power"]["max_grid_import_kw"],
                 "load_shed_kwh": snapshot["energy_kwh"]["load_shed"],
                 "pv_curtailed_kwh": snapshot["energy_kwh"]["pv_curtailed"],
                 "parameters": dict(params),
             }
             history.append(candidate_record)
-            if score < best_score - tolerance:
+            if improved:
                 best_score = score
                 best = snapshot
+                stale_iterations = 0
+            else:
+                stale_iterations += 1
 
             payload = to_agent_payload(
                 snapshot, iteration, max_iterations, dict(params), history, patterns
             )
+            if progress_callback:
+                progress_callback({"stage": "agent_feedback", "iteration": iteration,
+                                   "total_iterations": max_iterations})
             raw_decision = agent.evaluate(payload)
             try:
                 decision = validate_agent_decision(raw_decision)
@@ -136,9 +150,15 @@ def run_agentic_workflow(db_path: str, optimizer_module, agent,
                 "parameter_updates": decision["parameter_updates"],
                 "surplus_policy": decision["surplus_policy"],
             })
+            if progress_callback:
+                progress_callback({"stage": "candidate_validated", "iteration": iteration,
+                                   "total_iterations": max_iterations})
 
             if decision["action"] == "stop":
                 termination = decision["stop_reason"] or "agent_requested_stop"
+                break
+            if stale_iterations >= CONVERGENCE_PATIENCE:
+                termination = "converged_no_improvement"
                 break
             if iteration == max_iterations:
                 termination = "iteration_limit"
@@ -175,6 +195,9 @@ def run_agentic_workflow(db_path: str, optimizer_module, agent,
             "final_parameters": params,
         }
         try:
+            if progress_callback:
+                progress_callback({"stage": "generating_report", "iteration": len(history),
+                                   "total_iterations": max_iterations})
             report = agent.generate_report(report_context)
             report_source = "gemini" if agent.__class__.__name__ == "GeminiAgent" else "mock"
         except Exception as exc:

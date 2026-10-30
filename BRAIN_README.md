@@ -33,22 +33,24 @@ python main.py run --agent gemini --max-iterations 3
 ```bash
 python main.py serve --host 127.0.0.1 --port 8765
 ```
-Open `index.html` in a browser to use the local run console. It connects to `http://127.0.0.1:8765` by default. To use another API address, add `?api=http://127.0.0.1:PORT` to the page URL.
+The teammate's authenticated dashboard is in `grid-system-copy/`. Run it in a second terminal with `cd grid-system-copy && npm start`, then open `http://127.0.0.1:3000`. It connects to `http://127.0.0.1:8765`. The separate root `index.html` is not part of this frontend integration.
 
 Endpoints:
-- `GET /api/health`
-- `POST /api/run` JSON body, e.g. `{"agent":"mock","max_iterations":2}`
-- `GET /api/status/{request_id}`
-- `GET /api/result/{request_id}`
-- `GET /api/report/{request_id}`
+- `GET /api/health` returns `status`, `database_exists`, `database_ready`, and any `missing_tables`.
+- `POST /api/run` accepts an agent of `auto`, `mock`, or `gemini`, `max_iterations` from 1–12, and optional `horizon` from 1–672. Example: `{"agent":"mock","max_iterations":2}`. It returns HTTP 202 with `{"request_id":"REQ-…","status":"queued"}`.
+- `GET /api/status/{request_id}` returns `status`, normalized `request`, and `progress` (`stage`, `iteration`, `total_iterations`); failures also include `error`.
+- `GET /api/result/{request_id}` returns the complete workflow object: `agent_run_id`, `status`, `agent`, `iterations`, `termination_reason`, `best_candidate`, `surplus_allocation`, `relevant_patterns`, `candidate_history`, `agent_decisions`, `report`, `report_source`, and `database`. `best_candidate` includes validation, power, energy, battery, metrics, and limitations.
+- `GET /api/report/{request_id}` returns `agent_run_id`, `report`, and `report_source`.
 - Interactive docs: `http://127.0.0.1:8765/docs`
 
-The API binds to localhost by default and keeps request status in process memory. Restarting the server clears the API request cache, although completed optimization/agent records remain in SQLite.
+The API binds to localhost by default. API run status, progress, results, and errors are stored in the configured SQLite database and completed runs remain retrievable after an API restart. An in-flight run cannot resume after a process restart and is marked failed when the API starts again.
+Cross-origin browser calls are limited to `http://127.0.0.1` frontend origins; loopback ports are allowed so the frontend can use its fallback port when 3000 is busy.
 
 ## Safety and model boundaries
 - Every candidate must have all recorded optimizer constraint checks passing before it is sent to the agent.
 - Agent output is JSON-validated. The agent can only update four bounded optimizer weights and provide an advisory surplus policy.
 - The best candidate is selected using a frozen reference objective so objective values from different agent-proposed weights are not compared directly.
+- The feedback loop stops on an explicit agent stop, a continue-without-changes decision, two consecutive candidates without a tolerance-sized improvement, or the configured iteration limit (maximum 12).
 - Battery discharge is treated as an internal energy transfer, never as a second external source.
 - `eta_mainsys` is currently a useful-load utilization proxy: load-served energy divided by grid-import energy plus PV energy used. It is not a full export-aware efficiency metric.
 - `eta_cost_mainsys` and `aleph_mainsys` are unavailable until tariff and grid-export data/dispatch are implemented.

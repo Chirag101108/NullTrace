@@ -52,8 +52,8 @@ Created the first time the app runs. Edit or delete them in `users.json` (or rem
 - Sign in / create account tabs with inline errors and show/hide password
 - Sign-up rules: valid email, username 3–32 characters, password 8+ characters with confirmation, unique username and email
 - Sign-in lockout for 15 minutes after 5 failed attempts
-- Correct username and password sends you to google.com; wrong ones show an error and stay on the page
-- HttpOnly session cookie (8 hours); `/dashboard` still exists but is no longer part of the sign-in flow
+- Successful sign-in opens the authenticated `/dashboard`; wrong credentials show an error and stay on the page
+- HttpOnly session cookie (8 hours)
 - Server listens on 127.0.0.1 only
 
 ## Files
@@ -62,6 +62,10 @@ Created the first time the app runs. Edit or delete them in `users.json` (or rem
 - `public/`: page, styles, scripts, logos
 - `views/dashboard.html`: signed-in page (served only with a valid session)
 
-To send people somewhere else after sign-in, change the `redirect:` URL in `handleLogin` in `server.js` (it's `https://www.google.com/` now).
+To send people somewhere else after sign-in, change the `redirect:` URL in `handleLogin` in `server.js`.
+
+## Run the microgrid optimizer
+
+Start the brain API from the repository root with `python main.py serve`. Then start this frontend with `npm start` and open http://127.0.0.1:3000. The dashboard sends runs to `http://127.0.0.1:8765`; the browser needs both local servers running. Choose **Mock (offline)** to run without a Gemini API key, or **Automatic** to use Gemini when `GEMINI_API_KEY` is configured and otherwise use the mock agent.
 
 This is a local app. Don't put it on the internet as-is (no HTTPS, in-memory sessions).
