@@ -49,6 +49,13 @@ Third:
 E_in >> E_consumed
 
 
+3. Mathematical modelling:
+Newton's divided differences interpolation at a local level (2-3 discrete points) for interpolated function generation. Should span the entire dataset by sectioning local intervals.
+Trapezoidal rule as the numerical integration default.
+
+
+
+
 
 
 

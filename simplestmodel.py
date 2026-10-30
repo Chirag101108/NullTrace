@@ -2,6 +2,7 @@
 import cython
 import sympy
 import numpy
+import sqlite3 as sq
 class Reservoir():
     def __init__(self):
         super()
@@ -32,7 +33,16 @@ class System():
         self.ebuffer=None
         self.grid=None #live grid power transmission value. + -> input, - -> output to grid, selling back.
         self.srev=None #solar reservoir
+        self.appliances=[] #list of Appliance objects.
     def E_buffer_calc(self):
         for i in self.state:
             #NOTE:  check how to check type of an object to be of a certain class. this would get rid of the need to give every class an attribute telling logic which class they belong to.
             self.ebuffer6=i.emax-i.e
+
+class Parser():
+    def __init__(self):
+        con=sq.connect(database="microgrid.db")
+        cur=con.cursor()
+        cur.execute("create database microgrid.db")
+
+p=Parser()
