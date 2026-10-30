@@ -57,6 +57,9 @@ Trapezoidal rule as the numerical integration default.
 4. Vars for customdb: <img>.
 
 
+5. alpeh_mainsys -> the one general overall microgrid system rating, defined as (eta_mainsys)^w_e . (eta_cost_mainsys)^w_C
+
+
 
 
 

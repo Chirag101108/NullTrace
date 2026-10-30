@@ -1,9 +1,0 @@
-asset_id,asset_name,asset_type,rated_active_power_kw,rated_reactive_power_kvar,description
-GRID-POI-001,Grid point of interconnection,grid_intertie,100,100,Bidirectional utility connection
-PV-INV-001,Rooftop PV inverter,solar_pv,60,30,60 kW AC aggregate PV plant
-BESS-INV-001,Battery inverter,battery,30,30,120 kWh LFP battery; 30 kW bidirectional inverter
-LOAD-CRIT-001,Critical facility load,load,12,5,Critical; must be served
-LOAD-BLDG-001,Main building load,load,35,18,Flexible building demand
-LOAD-HVAC-001,HVAC load,load,24,12,Controllable thermal demand
-LOAD-EV-001,EV charging station,load,22,10,Deferrable charging demand
-LOAD-WATER-001,Water pumping load,load,8,4,Schedulable pumping demand

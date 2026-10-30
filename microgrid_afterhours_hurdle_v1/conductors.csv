@@ -1,0 +1,10 @@
+conductor_id,branch_id,phase,material,length_m,area_mm2,rho_ohm_m_at_20c,reference_temp_c,temp_coefficient_per_c,gmd_m,gmr_m,ampacity_a
+BR-001-COND-A,BR-001,A,copper,85,35,1.724e-08,20,0.00393,0.12,0.0072,125
+BR-001-COND-B,BR-001,B,copper,85,35,1.724e-08,20,0.00393,0.12,0.0072,125
+BR-001-COND-C,BR-001,C,copper,85,35,1.724e-08,20,0.00393,0.12,0.0072,125
+BR-002-COND-A,BR-002,A,copper,55,25,1.724e-08,20,0.00393,0.1,0.0058,100
+BR-002-COND-B,BR-002,B,copper,55,25,1.724e-08,20,0.00393,0.1,0.0058,100
+BR-002-COND-C,BR-002,C,copper,55,25,1.724e-08,20,0.00393,0.1,0.0058,100
+BR-003-COND-A,BR-003,A,copper,70,25,1.724e-08,20,0.00393,0.1,0.0058,100
+BR-003-COND-B,BR-003,B,copper,70,25,1.724e-08,20,0.00393,0.1,0.0058,100
+BR-003-COND-C,BR-003,C,copper,70,25,1.724e-08,20,0.00393,0.1,0.0058,100

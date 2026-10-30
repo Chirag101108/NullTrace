@@ -1,8 +1,0 @@
-measurement_type_id,display_name,unit,semantic_definition
-active_power_kw,Active power,kW,Signed injection into AC bus; loads are negative
-reactive_power_kvar,Reactive power,kvar,Signed injection into AC bus; loads are negative
-voltage_ll_v,Line-to-line RMS voltage,V,Three-phase bus-side RMS voltage
-current_a,Line current,A,Derived from three-phase apparent power and voltage
-power_factor,Power factor magnitude,1,Absolute active power divided by apparent power
-frequency_hz,AC frequency,Hz,Grid-connected frequency measurement
-state_of_charge_pct,Battery state of charge,%,Battery usable-energy state of charge
