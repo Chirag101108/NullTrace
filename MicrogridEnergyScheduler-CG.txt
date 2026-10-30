@@ -54,6 +54,9 @@ Newton's divided differences interpolation at a local level (2-3 discrete points
 Trapezoidal rule as the numerical integration default.
 
 
+4. Vars for customdb: <img>.
+
+
 
 
 
