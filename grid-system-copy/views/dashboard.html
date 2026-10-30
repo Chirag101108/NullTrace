@@ -20,7 +20,35 @@
       <dt>Email</dt><dd id="f-email"></dd>
       <dt>Account created</dt><dd id="f-created"></dd>
     </dl>
+
+    <section class="brain" aria-labelledby="brain-title">
+      <h2 id="brain-title">Microgrid optimizer</h2>
+      <p class="sub">Run a validated dispatch optimization and bounded agent feedback loop.</p>
+      <form id="run-form">
+        <div class="run-options">
+          <label>Agent
+            <select id="agent"><option value="auto">Automatic</option><option value="mock">Mock (offline)</option><option value="gemini">Gemini</option></select>
+          </label>
+          <label>Maximum iterations
+            <input id="iterations" type="number" min="1" max="12" value="3" required>
+          </label>
+          <label>Horizon intervals <span class="hint">Optional, 1–672</span>
+            <input id="horizon" type="number" min="1" max="672" placeholder="Use full dataset">
+          </label>
+        </div>
+        <button class="primary" id="run-button" type="submit">Run optimization</button>
+      </form>
+      <p id="run-status" class="notice" role="status" aria-live="polite">Checking brain API…</p>
+      <section id="run-results" hidden aria-labelledby="results-title">
+        <h3 id="results-title">Latest run</h3>
+        <dl class="result-grid" id="result-metrics"></dl>
+        <details><summary>Candidate history</summary><pre id="candidate-history"></pre></details>
+        <details><summary>Relevant patterns and surplus allocation</summary><pre id="run-context"></pre></details>
+        <details open><summary>Technical report</summary><pre id="run-report"></pre></details>
+      </section>
+    </section>
   </main>
+  <script src="/brain-config.js"></script>
   <script src="/dashboard.js"></script>
 </body>
 </html>

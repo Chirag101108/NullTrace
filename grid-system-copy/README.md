@@ -52,8 +52,8 @@ Created the first time the app runs. Edit or delete them in `users.json` (or rem
 - Sign in / create account tabs with inline errors and show/hide password
 - Sign-up rules: valid email, username 3–32 characters, password 8+ characters with confirmation, unique username and email
 - Sign-in lockout for 15 minutes after 5 failed attempts
-- Correct username and password sends you to google.com; wrong ones show an error and stay on the page
-- HttpOnly session cookie (8 hours); `/dashboard` still exists but is no longer part of the sign-in flow
+- Successful sign-in opens the authenticated `/dashboard`; wrong credentials show an error and stay on the page
+- HttpOnly session cookie (8 hours)
 - Server listens on 127.0.0.1 only
 
 ## Files
@@ -62,6 +62,10 @@ Created the first time the app runs. Edit or delete them in `users.json` (or rem
 - `public/`: page, styles, scripts, logos
 - `views/dashboard.html`: signed-in page (served only with a valid session)
 
-To send people somewhere else after sign-in, change the `redirect:` URL in `handleLogin` in `server.js` (it's `https://www.google.com/` now).
+To send people somewhere else after sign-in, change the `redirect:` URL in `handleLogin` in `server.js`.
+
+## Run the microgrid optimizer
+
+From the repository root, start both services with `bash start_local.sh`. The brain API defaults to `127.0.0.1:8765`; this frontend defaults to `127.0.0.1:3000`. The launcher rejects a port collision and prints the frontend URL. Set `AFTERHOURS_API_PORT` and `AFTERHOURS_FRONTEND_PORT` to choose different ports; the API URL, frontend security policy, and dashboard client are configured together. Use the `grid-system-copy` frontend for the optimizer dashboard. Choose **Mock (offline)** to run without a Gemini API key, or **Automatic** to use Gemini when `GEMINI_API_KEY` is configured and otherwise use the mock agent.
 
 This is a local app. Don't put it on the internet as-is (no HTTPS, in-memory sessions).

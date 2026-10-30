@@ -1,0 +1,6 @@
+exec: bash start_local.sh -> handles everything
+harcoded passwords (Defaults):
+admin1 : 121
+Admin-2 : 122
+Admin - 3 : 123
+Admin - 4 : 124

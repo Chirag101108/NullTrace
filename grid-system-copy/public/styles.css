@@ -407,3 +407,107 @@ body:has(.dash) {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Microgrid run console */
+.brain {
+  margin-top: 48px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+
+.brain h2,
+.brain h3 {
+  margin: 0 0 8px;
+  color: var(--ink);
+}
+
+.run-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.run-options label {
+  color: var(--ink);
+}
+
+.run-options input,
+.run-options select {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  margin-top: 6px;
+  padding: 0 10px;
+  border: 1px solid #36533b;
+  border-radius: 8px;
+  background: var(--black);
+  color: var(--ink);
+  font: inherit;
+}
+
+.run-options .hint {
+  display: inline;
+  font-weight: 400;
+}
+
+.brain .primary {
+  max-width: 260px;
+}
+
+.brain .notice[data-kind="info"] {
+  color: var(--muted);
+  background: var(--black);
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(0, 1.2fr);
+  margin: 18px 0 24px;
+  border-top: 1px solid var(--line);
+}
+
+.result-grid dt,
+.result-grid dd {
+  min-width: 0;
+  margin: 0;
+  padding: 10px 6px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--line);
+}
+
+.result-grid dt {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.brain details {
+  margin: 12px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--black);
+}
+
+.brain summary {
+  padding: 12px;
+  color: var(--green-bright);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.brain pre {
+  max-height: 420px;
+  margin: 0;
+  padding: 0 12px 14px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@media (max-width: 520px) {
+  .result-grid { grid-template-columns: 1fr; }
+  .result-grid dt { border-bottom: 0; padding-bottom: 2px; }
+  .result-grid dd { padding-top: 2px; }
+}
