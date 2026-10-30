@@ -1,0 +1,147 @@
+Purpose:
+A synthetic, impedance-aware model of a small three-phase AC microgrid. It records the network's physical structure, electrical behaviour, environmental conditions, battery state, and operating decisions.
+
+Dataset:
+> Time span: 7 days
+> Sampling interval: 15 minutes
+> Time intervals: 672 (7 x 24 x 4)
+> Microgrids: 1
+> Buses: 4
+> Distribution branches: 3
+> Physical phase conductors: 9 (3 per branch)
+> Spatial samples: 54 (6 per conductor)
+> Asset records: 17 (8 equipment assets + 9 conductor assets)
+> Measurement records: 45,024
+> Measurement types: 9
+> Bus measurement records: 2,688
+> Branch measurement records: 2,016
+> Weather records: 672
+> Battery-state records: 672
+> Dispatch records: 672
+> Interval-summary records: 672
+
+All data is synthetic and simulated; it is not telemetry collected from a real installation.
+
+
+
+Table Legend
+
+
+
+microgrid:
+Stores the identity and system-wide configuration of the microgrid, including its name, timezone, nominal voltage, nominal frequency, and interval duration.
+
+asset:
+Stores equipment connected to the microgrid: grid intertie, solar PV, battery energy-storage system, and load groups. It records each asset's identity, type, connection point, and rated active/reactive power. Conductor assets are also represented here.
+
+bus:
+Stores electrical nodes (connection points) in the network. Equipment and branches connect to buses. Each bus has an identity and nominal electrical configuration.
+
+branch:
+Stores the distribution connections between pairs of buses. It describes the network topology and identifies the physical branch connecting its sending and receiving buses.
+
+conductor:
+Stores the physical properties of each phase conductor in a branch, including its material, phase, length, cross-sectional area, geometric parameters, and ampacity.
+
+conductor_sample:
+Stores spatial samples along each conductor. Each sample has a position along the conductor and associated conductor-property data. The six samples per conductor support spatial interpolation and numerical integration along its length.
+
+measurement_type:
+A dictionary of measurement definitions. It identifies what a measurement represents and records its unit and related metadata (for example, active power in kW or voltage in V).
+
+measurement:
+Stores time-stamped measurements associated with assets. The dataset includes quantities such as active power, reactive power, voltage, voltage angle, current, power factor, frequency, state of charge, and conductor temperature. Measurement identity is protected by a semantic uniqueness rule based on interval, asset, measurement type, and channel.
+
+bus_measurement:
+Stores time-stamped electrical observations at buses, including bus-level voltage information such as voltage magnitude and angle.
+
+branch_measurement:
+Stores time-stamped electrical observations for distribution branches, including branch current and power-flow/loss-related quantities.
+
+weather:
+Stores environmental conditions for each interval, including solar irradiance, ambient temperature, and cloud factor. These variables help explain PV output and conductor thermal conditions.
+
+battery_state:
+Stores the battery's state over time, including state of charge and charging/discharging state or power information.
+
+dispatch:
+Stores operating decisions for each interval, including battery charging/discharging commands and other dispatch information. It represents what the scheduler instructs the system to do, rather than merely what the system measures.
+
+interval_summary:
+Stores a per-interval summary of the microgrid's operation, such as aggregate generation, demand, grid exchange, and network-loss/balance information.
+
+
+
+Meaning Of Counts:
+
+
+
+672 time intervals
+The seven-day dataset is divided into 15-minute slots. There are 96 slots per day, giving 672 slots in total.
+
+9 physical phase conductors
+There are three branches, each represented by three phase conductors (A, B, and C): 3 x 3 = 9. These are physical phase-wire records, not nine separate branches.
+
+3 distribution branches
+These are the three cable sections connecting the four buses in the radial network. The branches define the paths through which electrical power flows.
+
+54 spatial conductor samples
+Each of the nine phase conductors has six samples along its length: 9 x 6 = 54. The samples provide spatial points for interpolation and integration; they do not mean there are 54 separate wires.
+
+45,024 measurement records
+This is the number of rows in the general measurement table. Each row records one measurement of one type for one asset/channel at one interval. It is distinct from the specialised bus_measurement and branch_measurement tables.
+
+9 measurement types
+The measurement-type dictionary defines nine kinds of measured quantities, including active power, reactive power, line-line RMS voltage, voltage angle, current, power factor, frequency, battery state of charge, and conductor temperature.
+
+2,688 bus measurement records
+There are 4 buses x 672 intervals = 2,688 bus-level records.
+
+2,016 branch measurement records
+There are 3 branches x 672 intervals = 2,016 branch-level records.
+
+672 weather, battery-state, dispatch, and interval-summary records each
+Each of these tables has one record per 15-minute interval in the seven-day dataset.
+
+
+
+The Network And Topology
+
+
+
+Network topology:
+> BUS-000: point of common coupling / grid-source bus
+> BUS-010: critical/building bus
+> BUS-020: distributed-energy-resource bus
+> BUS-030: flexible-load bus
+> BR-001 connects BUS-000 to BUS-010.
+> BR-002 connects BUS-010 to BUS-020.
+> BR-003 connects BUS-010 to BUS-030.
+
+The network is a radial, balanced, three-phase AC distribution model. The power-flow calculation uses a positive-sequence, quasi-static backward-forward-sweep approach with constant-PQ load representations.
+
+Conductor electrical model:
+> Resistance is calculated from material resistivity, length, and cross-sectional area.
+> Inductive reactance is estimated using conductor geometry (GMD and GMR) and the 50 Hz operating frequency.
+> Series impedance is represented as Z = R + jX.
+> Branch active and reactive losses are estimated from current and branch resistance/reactance.
+
+Important modelling boundaries:
+> The model is balanced and positive-sequence; it is not an unbalanced four-wire or electromagnetic-transient model.
+> It does not model neutral current, phase imbalance, harmonics, switching transients, or detailed protection behaviour.
+> The current power-flow calculation uses 20 °C reference resistance. Temperature-corrected resistance is available conceptually, but electrothermal feedback is not yet iterated into the load-flow solution.
+> Loads are represented as aggregate constant-PQ loads, not as fixed resistors or detailed appliance-level ZIP models.
+> The battery has a 120 kWh energy capacity and a 30 kW inverter rating; its SOC is bounded between 20% and 95%.
+
+
+
+6. HIGH-LEVEL WAY TO THINK ABOUT THE DATABASE
+
+
+
+> What exists? microgrid, asset, bus, branch, conductor, conductor_sample.
+> What is being measured? measurement_type, measurement, bus_measurement, branch_measurement.
+> What affects operation? weather, battery_state.
+> What does the controller decide, and what happened overall? dispatch, interval_summary.
+
+The physical-structure tables describe the network. The time-series tables describe how it behaves. The dispatch table records operating decisions that can later be produced or optimized by the energy scheduler.
