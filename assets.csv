@@ -1,0 +1,18 @@
+asset_id,asset_name,asset_type,connection_id,rated_active_power_kw,rated_reactive_power_kvar
+GRID-POI-001,Grid point of interconnection,grid_intertie,BUS-000,100,100
+PV-INV-001,PV inverter,solar_pv,BUS-020,60,30
+BESS-INV-001,Battery inverter,battery,BUS-020,30,30
+LOAD-CRIT-001,Critical facility,load,BUS-010,12,5
+LOAD-BLDG-001,Main building,load,BUS-010,35,18
+LOAD-HVAC-001,HVAC,load,BUS-030,24,12
+LOAD-EV-001,EV charger,load,BUS-030,22,10
+LOAD-WATER-001,Water pump,load,BUS-030,8,4
+BR-001-COND-A,BR-001 phase A conductor,conductor,BR-001,0,0
+BR-001-COND-B,BR-001 phase B conductor,conductor,BR-001,0,0
+BR-001-COND-C,BR-001 phase C conductor,conductor,BR-001,0,0
+BR-002-COND-A,BR-002 phase A conductor,conductor,BR-002,0,0
+BR-002-COND-B,BR-002 phase B conductor,conductor,BR-002,0,0
+BR-002-COND-C,BR-002 phase C conductor,conductor,BR-002,0,0
+BR-003-COND-A,BR-003 phase A conductor,conductor,BR-003,0,0
+BR-003-COND-B,BR-003 phase B conductor,conductor,BR-003,0,0
+BR-003-COND-C,BR-003 phase C conductor,conductor,BR-003,0,0
