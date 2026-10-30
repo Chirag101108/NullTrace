@@ -302,7 +302,7 @@ async function handleLogin(req, res) {
   failures.delete(throttleKey);
   user.lastLoginAt = new Date().toISOString();
   saveDb().catch((error) => console.error('Could not record last sign-in:', error.message));
-  return sendJson(res, 200, { ok: true, redirect: 'https://www.google.com/', user: publicUser(user) }, { 'Set-Cookie': startSession(res, user) });
+  return sendJson(res, 200, { ok: true, redirect: '/dashboard', user: publicUser(user) }, { 'Set-Cookie': startSession(res, user) });
 }
 
 function handleLogout(req, res) {

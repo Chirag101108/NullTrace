@@ -92,7 +92,7 @@ signinForm.addEventListener('submit', async (event) => {
   button.textContent = 'Signing in…';
   try {
     const result = await post('/api/login', data);
-    window.location.assign(result.redirect || 'https://www.google.com/');
+    window.location.assign(result.redirect || '/dashboard');
   } catch (error) {
     notify(signinNotice, 'error', error.message);
     $('si-password').value = '';

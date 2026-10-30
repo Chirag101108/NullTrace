@@ -3,23 +3,50 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#050805">
   <title>Grid System</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <main class="dash">
     <header class="dash-head">
-      <img src="/assets/microgrid-optimizer.png" alt="MicroGridOptimizer" width="720" height="415">
-      <button class="ghost" id="signout" type="button">Sign out</button>
+      <a class="brand" href="/" aria-label="Grid System home">
+        <img src="/assets/microgrid-optimizer.png" alt="MicroGridOptimizer" width="720" height="415">
+      </a>
+      <div class="dash-actions">
+        <span class="session-status"><span class="status-dot"></span> Secure session</span>
+        <button class="ghost" id="signout" type="button">Sign out <span aria-hidden="true">↗</span></button>
+      </div>
     </header>
-    <h1 id="welcome">Welcome</h1>
-    <p class="sub">You’re signed in to Grid System.</p>
-    <dl class="facts">
-      <dt>Name</dt><dd id="f-name"></dd>
-      <dt>Username</dt><dd id="f-username"></dd>
-      <dt>Email</dt><dd id="f-email"></dd>
-      <dt>Account created</dt><dd id="f-created"></dd>
-    </dl>
+
+    <section class="welcome-card" aria-labelledby="welcome">
+      <div class="welcome-copy">
+        <p class="eyebrow"><span class="eyebrow-mark">◆</span> GRID SYSTEM / ACCOUNT</p>
+        <h1 id="welcome">Welcome</h1>
+        <p class="sub">Your workspace is online. Here’s your account overview.</p>
+      </div>
+      <div class="energy-mark" aria-hidden="true">
+        <span class="energy-ring ring-one"></span>
+        <span class="energy-ring ring-two"></span>
+        <span class="energy-core">G</span>
+      </div>
+      <div class="welcome-foot"><span>POWERING SMARTER GRIDS</span><span class="live-indicator"><span></span> SYSTEM ACTIVE</span></div>
+    </section>
+
+    <section class="account-section" aria-labelledby="account-heading">
+      <div class="section-heading">
+        <div><p class="eyebrow">YOUR DETAILS</p><h2 id="account-heading">Account profile</h2></div>
+        <span class="account-badge"><span aria-hidden="true">✓</span> Verified account</span>
+      </div>
+      <dl class="facts">
+        <div class="fact-card"><dt><span class="fact-icon">◉</span> Full name</dt><dd id="f-name"></dd></div>
+        <div class="fact-card"><dt><span class="fact-icon">@</span> Username</dt><dd id="f-username"></dd></div>
+        <div class="fact-card"><dt><span class="fact-icon">✉</span> Email address</dt><dd id="f-email"></dd></div>
+        <div class="fact-card"><dt><span class="fact-icon">◷</span> Member since</dt><dd id="f-created"></dd></div>
+      </dl>
+    </section>
+
+    <footer class="dash-footer"><span class="footer-mark">GS<span>.</span></span><span>Grid System <span class="footer-separator">/</span> Microgrid optimization</span><span class="footer-secure">LOCAL ACCOUNT · PRIVATE BY DESIGN</span></footer>
   </main>
   <script src="/dashboard.js"></script>
 </body>
