@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <title>Sign in to Grid System</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="team" aria-label="Null Trace">
+      <svg class="network" viewBox="0 0 520 300" aria-hidden="true" focusable="false">
+        <g class="lines">
+          <path id="l1" d="M40 230 L170 150 L300 210 L430 90 L490 150"/>
+          <path id="l2" d="M170 150 L230 60 L360 40 L430 90"/>
+          <path id="l3" d="M300 210 L360 270 L480 250"/>
+        </g>
+        <g class="nodes">
+          <circle cx="40" cy="230" r="4"/><circle cx="170" cy="150" r="6"/><circle cx="300" cy="210" r="4"/>
+          <circle cx="430" cy="90" r="6"/><circle cx="490" cy="150" r="3"/><circle cx="230" cy="60" r="3"/>
+          <circle cx="360" cy="40" r="4"/><circle cx="360" cy="270" r="3"/><circle cx="480" cy="250" r="4"/>
+        </g>
+        <circle class="pulse" r="5"><animateMotion dur="7s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="linear"><mpath href="#l1"/></animateMotion></circle>
+      </svg>
+      <img class="team-logo" src="/assets/null-trace.png" alt="Null Trace" width="720" height="472">
+      <p class="team-line">Grid System is the microgrid optimization platform built by Null Trace.</p>
+    </section>
+
+    <section class="product">
+      <div class="panel">
+        <img class="product-logo" src="/assets/microgrid-optimizer.png" alt="MicroGridOptimizer" width="720" height="415">
+
+        <div class="tabs" role="tablist" aria-label="Account">
+          <button class="tab" id="tab-signin" role="tab" aria-selected="true" aria-controls="view-signin" type="button">Sign in</button>
+          <button class="tab" id="tab-signup" role="tab" aria-selected="false" aria-controls="view-signup" type="button" tabindex="-1">Create account</button>
+        </div>
+
+        <div id="view-signin" role="tabpanel" aria-labelledby="tab-signin">
+          <form id="signin-form" novalidate>
+            <div class="field">
+              <label for="si-username">Username</label>
+              <input id="si-username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+            </div>
+            <div class="field">
+              <label for="si-password">Password</label>
+              <div class="pw">
+                <input id="si-password" name="password" type="password" autocomplete="current-password" required>
+                <button class="reveal" type="button" data-reveal="si-password" aria-label="Show password" aria-pressed="false">Show</button>
+              </div>
+            </div>
+            <p class="notice" id="signin-notice" role="status" aria-live="polite" hidden></p>
+            <button class="primary" id="signin-submit" type="submit">Sign in</button>
+          </form>
+        </div>
+
+        <div id="view-signup" role="tabpanel" aria-labelledby="tab-signup" hidden>
+          <form id="signup-form" novalidate>
+            <div class="field">
+              <label for="su-name">Full name</label>
+              <input id="su-name" name="name" type="text" autocomplete="name" maxlength="100" required>
+            </div>
+            <div class="field">
+              <label for="su-email">Email</label>
+              <input id="su-email" name="email" type="email" autocomplete="email" maxlength="254" required>
+            </div>
+            <div class="field">
+              <label for="su-username">Username</label>
+              <input id="su-username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="32" aria-describedby="su-username-hint" required>
+              <span class="hint" id="su-username-hint">3–32 characters: letters, numbers, dots, dashes, underscores.</span>
+            </div>
+            <div class="field">
+              <label for="su-password">Password</label>
+              <div class="pw">
+                <input id="su-password" name="password" type="password" autocomplete="new-password" maxlength="128" aria-describedby="su-password-hint" required>
+                <button class="reveal" type="button" data-reveal="su-password" aria-label="Show password" aria-pressed="false">Show</button>
+              </div>
+              <span class="hint" id="su-password-hint">At least 8 characters.</span>
+            </div>
+            <div class="field">
+              <label for="su-confirm">Confirm password</label>
+              <input id="su-confirm" name="confirmPassword" type="password" autocomplete="new-password" maxlength="128" required>
+            </div>
+            <p class="notice" id="signup-notice" role="status" aria-live="polite" hidden></p>
+            <button class="primary" id="signup-submit" type="submit">Create account</button>
+          </form>
+        </div>
+
+        <p class="fine">Accounts are saved on this computer only.</p>
+      </div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
