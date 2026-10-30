@@ -1,0 +1,10 @@
+measurement_type_id,display_name,unit,semantic_definition
+active_power_kw,Active power,kW,Signed injection into network
+reactive_power_kvar,Reactive power,kvar,Signed injection into network
+voltage_ll_v,Line-line RMS voltage,V,Positive-sequence bus voltage
+voltage_angle_deg,Voltage angle,degree,Relative to source
+current_a,RMS current,A,Asset or conductor current
+power_factor,Power factor,1,Absolute P divided by apparent power
+frequency_hz,Frequency,Hz,Grid-connected frequency
+state_of_charge_pct,Battery SOC,%,Usable energy SOC
+conductor_temperature_c,Conductor temperature,degC,Steady-state synthetic estimate

@@ -1,0 +1,5 @@
+bus_id,bus_name,nominal_voltage_ll_v,phases
+BUS-000,PCC/source,400,ABC
+BUS-010,Critical/building,400,ABC
+BUS-020,DER,400,ABC
+BUS-030,Flexible loads,400,ABC
