@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+AGENT_MODE="${AFTERHOURS_DEFAULT_AGENT:-auto}"
 API_HOST="127.0.0.1"
 API_PORT="${AFTERHOURS_API_PORT:-8765}"
 FRONTEND_PORT="${AFTERHOURS_FRONTEND_PORT:-3000}"
@@ -9,6 +10,46 @@ PYTHON_BIN="${AFTERHOURS_PYTHON:-python3}"
 FRONTEND_DIR="${AFTERHOURS_FRONTEND_DIR:-$ROOT_DIR/grid-system-copy}"
 DB_PATH="${AFTERHOURS_DB:-$ROOT_DIR/microgrid_afterhours_hurdle_v1/microgrid.sqlite}"
 BRAIN_API_URL="http://${API_HOST}:${API_PORT}"
+
+usage() {
+  echo "Usage: ./start_local.sh [--agent mock|gemini]"
+  echo "  --agent mock     Use the deterministic offline agent by default"
+  echo "  --agent gemini   Use Gemini by default (key from environment or dashboard)"
+  echo "Without --agent, Automatic uses Gemini when GEMINI_API_KEY is set, otherwise Mock."
+}
+
+while (($#)); do
+  case "$1" in
+    --agent)
+      if (($# < 2)); then
+        echo "Missing value for --agent (choose mock or gemini)." >&2
+        usage >&2
+        exit 2
+      fi
+      AGENT_MODE="$2"
+      shift 2
+      ;;
+    --agent=*)
+      AGENT_MODE="${1#*=}"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ "$AGENT_MODE" != "auto" && "$AGENT_MODE" != "mock" && "$AGENT_MODE" != "gemini" ]]; then
+  echo "Unsupported agent '$AGENT_MODE'. Choose mock, gemini, or auto." >&2
+  exit 2
+fi
+export AFTERHOURS_DEFAULT_AGENT="$AGENT_MODE"
 
 if [[ "$API_PORT" == "$FRONTEND_PORT" ]]; then
   echo "API and frontend cannot share port ${API_PORT}. Use distinct ports (defaults: API 8765, frontend 3000)." >&2

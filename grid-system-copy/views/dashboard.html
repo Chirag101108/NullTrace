@@ -3,52 +3,158 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Grid System</title>
+  <meta name="theme-color" content="#09120f">
+  <title>AfterHours · Microgrid Control</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <main class="dash">
-    <header class="dash-head">
-      <img src="/assets/microgrid-optimizer.png" alt="MicroGridOptimizer" width="720" height="415">
-      <button class="ghost" id="signout" type="button">Sign out</button>
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand" href="#home" data-page-link="home" aria-label="AfterHours home">
+        <span class="brand-mark" aria-hidden="true">⌁</span>
+        <span><strong>Grid System</strong><small>Null Trace · Microgrid Brain</small></span>
+      </a>
+      <div class="header-tools">
+        <div class="connection" aria-live="polite"><span class="lamp" id="health-lamp"></span><span id="health-label">Checking local API…</span></div>
+        <span class="signed-in" id="welcome">Signed in</span>
+        <button class="signout" id="signout" type="button">Sign out</button>
+      </div>
     </header>
-    <h1 id="welcome">Welcome</h1>
-    <p class="sub">You’re signed in to Grid System.</p>
-    <dl class="facts">
-      <dt>Name</dt><dd id="f-name"></dd>
-      <dt>Username</dt><dd id="f-username"></dd>
-      <dt>Email</dt><dd id="f-email"></dd>
-      <dt>Account created</dt><dd id="f-created"></dd>
-    </dl>
 
-    <section class="brain" aria-labelledby="brain-title">
-      <h2 id="brain-title">Microgrid optimizer</h2>
-      <p class="sub">Run a validated dispatch optimization and bounded agent feedback loop.</p>
-      <form id="run-form">
-        <div class="run-options">
-          <label>Agent
-            <select id="agent"><option value="auto">Automatic</option><option value="mock">Mock (offline)</option><option value="gemini">Gemini</option></select>
-          </label>
-          <label>Maximum iterations
-            <input id="iterations" type="number" min="1" max="12" value="3" required>
-          </label>
-          <label>Horizon intervals <span class="hint">Optional, 1–672</span>
-            <input id="horizon" type="number" min="1" max="672" placeholder="Use full dataset">
-          </label>
+    <nav class="app-nav" aria-label="Main navigation">
+      <button type="button" data-page="home" aria-current="page">Home</button>
+      <button type="button" data-page="graph">Graph</button>
+      <button type="button" data-page="optimizer">Optimizer</button>
+      <button type="button" data-page="report">Agent report</button>
+    </nav>
+
+    <section class="page" id="page-home">
+      <div class="hero">
+        <p class="eyebrow">AfterHours · microgrid intelligence</p>
+        <h1>See your energy system clearly.</h1>
+        <p>Inspect measured operation, compare a validated candidate, and track the assumptions behind its Aleph score.</p>
+        <div class="quick-links">
+          <a href="#graph" data-page-link="graph"><strong>01 · Graph</strong><span>Compare measured and optimized operation, then inspect Aleph.</span></a>
+          <a href="#optimizer" data-page-link="optimizer"><strong>02 · Optimizer</strong><span>Run the local scheduler and review its constraint checks.</span></a>
+          <a href="#report" data-page-link="report"><strong>03 · Agent report</strong><span>Read the final mock or Gemini explanation for the selected run.</span></a>
         </div>
-        <button class="primary" id="run-button" type="submit">Run optimization</button>
-      </form>
-      <p id="run-status" class="notice" role="status" aria-live="polite">Checking brain API…</p>
-      <section id="run-results" hidden aria-labelledby="results-title">
-        <h3 id="results-title">Latest run</h3>
-        <dl class="result-grid" id="result-metrics"></dl>
-        <details><summary>Candidate history</summary><pre id="candidate-history"></pre></details>
-        <details><summary>Relevant patterns and surplus allocation</summary><pre id="run-context"></pre></details>
-        <details open><summary>Technical report</summary><pre id="run-report"></pre></details>
+      </div>
+
+      <section class="compare-section" aria-labelledby="compare-heading">
+        <div class="section-heading">
+          <div><p class="eyebrow">Operating comparison</p><h2 id="compare-heading">Before and after</h2></div>
+          <span id="compare-context">Before: measured baseline</span>
+        </div>
+        <div class="view-toggle" role="group" aria-label="Choose measured baseline or optimized candidate">
+          <button type="button" data-view="before" aria-pressed="true">Before</button>
+          <button type="button" data-view="after" aria-pressed="false">After</button>
+        </div>
+        <p class="view-caption" id="view-caption">Measured baseline from the supplied interval data.</p>
+        <div class="metrics-grid" id="summary-metrics" aria-live="polite">
+          <article class="metric"><span>Grid import energy</span><strong>—</strong></article>
+          <article class="metric"><span>Net energy cost</span><strong>—</strong></article>
+          <article class="metric"><span>Load served</span><strong>—</strong></article>
+          <article class="metric"><span>PV energy used</span><strong>—</strong></article>
+          <article class="metric"><span>Aleph score</span><strong>—</strong></article>
+          <article class="metric"><span>Constraint checks</span><strong>—</strong></article>
+        </div>
+        <p class="data-note" id="data-note">Run the optimizer to load the matching measured and candidate interval series.</p>
       </section>
     </section>
-  </main>
+
+    <section class="page" id="page-graph" hidden>
+      <div class="page-heading"><p class="eyebrow">Measured vs optimized</p><h1>Graph</h1><p>Use the same view selector to switch every comparison chart between measured baseline and the selected optimized candidate.</p></div>
+      <div class="view-toggle page-toggle" role="group" aria-label="Choose measured baseline or optimized candidate">
+        <button type="button" data-view="before" aria-pressed="true">Before</button>
+        <button type="button" data-view="after" aria-pressed="false">After</button>
+      </div>
+      <p class="view-caption">Current View: <strong class="current-view-label">Before · Measured Baseline</strong></p>
+
+      <article class="panel chart-panel">
+        <div class="panel-heading"><div><p class="eyebrow">Whole-microgrid operating index</p><h2>Aleph</h2></div><strong class="score-pill" id="aleph-score">— <small>/ 100</small></strong></div>
+        <p class="panel-copy" id="aleph-note">Aleph is calculated for a validated optimized candidate; no baseline score is inferred.</p>
+        <div class="chart-wrap"><canvas id="aleph-chart" role="img" aria-label="Cumulative Aleph score over the optimization horizon"></canvas><p class="chart-empty" id="aleph-empty" hidden>Aleph is not calculated for the measured baseline. Switch to After to view the candidate score.</p></div>
+        <p class="chart-caption">X-axis: interval start in Asia/Kolkata time · each point includes results from the start of the horizon through that interval.</p>
+        <div class="aleph-components" id="aleph-components" aria-label="Aleph component scores"></div>
+        <section class="formula-card" aria-labelledby="formula-title">
+          <p class="eyebrow">Score definition</p>
+          <h3 id="formula-title">Aleph formula</h3>
+          <p class="formula" aria-label="Aleph of t equals the sum over i of weight i times component i of t"><span>Aleph</span>(<i>t</i>) = <span class="sum-symbol">∑</span><sub><i>i</i>=1</sub><sup>6</sup> <i>w</i><sub><i>i</i></sub> · <i>C</i><sub><i>i</i></sub>(<i>t</i>)</p>
+          <p class="formula-note">Each component <i>C</i><sub><i>i</i></sub> is scored from 0–100. Weights sum to 1.00. If any component is unavailable, Aleph is unavailable; the remaining weights are not rescaled.</p>
+          <div class="weight-list" id="aleph-weights"></div>
+          <details class="formula-details"><summary>What the components mean</summary><ul>
+            <li><b>Energy adequacy:</b> equal blend of total-load and critical-load service.</li>
+            <li><b>Physical efficiency:</b> served energy divided by external energy, adjusted for net stored-energy change. Battery discharge is not counted as a new source.</li>
+            <li><b>Renewable utilization:</b> PV used divided by PV generated.</li>
+            <li><b>Storage:</b> charge/discharge efficiency adjusted by the optimizer’s linear degradation-cost proxy.</li>
+            <li><b>Economics:</b> candidate tariff cost compared with the measured baseline bill under the configured synthetic schedule.</li>
+            <li><b>Network checks:</b> persisted LP checks only; this is not an AC voltage or feeder thermal-feasibility proof.</li>
+          </ul></details>
+          <p class="synthetic-note">Tariff rates and one-to-one export credits are synthetic demo assumptions, not a utility tariff or export agreement. The optimizer has no export decision variable.</p>
+        </section>
+      </article>
+
+      <article class="panel chart-panel dispatch-panel">
+        <div class="panel-heading"><div><p class="eyebrow">Interval power</p><h2>Measured and scheduled power</h2></div></div>
+        <p class="panel-copy" id="dispatch-note">Measured demand, PV generation and signed grid exchange for the selected view.</p>
+        <div class="chart-wrap"><canvas id="dispatch-chart" role="img" aria-label="Power by interval"></canvas><p class="chart-empty" id="dispatch-empty">Run the optimizer to load time-series data.</p></div>
+        <p class="chart-caption">Power in kW · negative measured grid exchange represents historical export. Candidate export remains zero because the optimizer has no export variable.</p>
+      </article>
+
+      <article class="panel chart-panel custom-graph-panel">
+        <div class="panel-heading"><div><p class="eyebrow">Data explorer</p><h2>Graph your JSON</h2></div></div>
+        <p class="panel-copy">Optional custom Chart.js graph. This user-provided chart is separate from the measured/optimized comparison above.</p>
+        <div class="custom-graph-layout">
+          <div><label for="chart-type">Chart type</label><select id="chart-type"><option value="line">Line</option><option value="bar">Bar</option></select>
+            <label for="json-data" class="json-label">JSON data</label><textarea id="json-data" spellcheck="false" aria-describedby="json-hint"></textarea>
+            <p class="hint" id="json-hint">Use labels and datasets with numeric values. Optional beforeData / afterData arrays make this chart follow the shared toggle.</p><button class="action-button" id="draw-chart" type="button">Render graph →</button><p class="notice" id="graph-notice" role="status" aria-live="polite"></p></div>
+          <div class="custom-chart-wrap"><canvas id="data-chart" aria-label="Graph of user-provided JSON data"></canvas></div>
+        </div>
+      </article>
+    </section>
+
+    <main class="page" id="page-optimizer" hidden>
+      <div class="page-heading"><p class="eyebrow">AfterHours prototype</p><h1>Microgrid run console</h1><p>Run the deterministic scheduler with an optional bounded AI feedback loop. Physical dispatch and constraint checks stay with the optimizer.</p></div>
+      <section class="run-card" aria-label="Run configuration">
+        <label>Decision agent<select id="agent"><option value="auto">Auto · Gemini if configured</option><option value="mock">Offline mock</option><option value="gemini">Gemini API</option></select></label>
+        <label>Maximum Iterations <span class="hint" id="iteration-limit-hint">Mock: up to 12 · Gemini: up to 5</span><select id="iterations"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>12</option></select></label>
+        <label>Horizon intervals <span class="hint">Optional · 1–672</span><input id="horizon" type="number" min="1" max="672" placeholder="Full dataset · 672"></label>
+        <button class="action-button" id="run-button" type="button">Run optimizer <span aria-hidden="true">→</span></button>
+        <div class="gemini-key-field" id="gemini-key-field" hidden>
+          <label for="gemini-api-key">Gemini API key <span class="hint">Optional override</span></label>
+          <input id="gemini-api-key" type="text" inputmode="text" maxlength="256" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Gemini API key, displayed as asterisks" aria-describedby="gemini-key-hint">
+          <p class="hint" id="gemini-key-hint">Typed characters display as asterisks. Leave blank to use GEMINI_API_KEY from the launcher. The key is used for this run and is not saved.</p>
+        </div>
+      </section>
+      <p class="notice" id="run-status" role="status" aria-live="polite">Checking local API…</p>
+      <section class="compare-section optimizer-results" aria-labelledby="candidate-heading">
+        <div class="section-heading"><div><p class="eyebrow">Candidate result</p><h2 id="candidate-heading">Latest validated candidate</h2></div><span id="run-id">No run yet</span></div>
+        <div class="view-toggle page-toggle" role="group" aria-label="Choose measured baseline or optimized candidate">
+          <button type="button" data-view="before" aria-pressed="true">Before</button><button type="button" data-view="after" aria-pressed="false">After</button>
+        </div>
+        <p class="view-caption">Current View: <strong class="current-view-label">Before · Measured Baseline</strong></p>
+        <div class="metrics-grid" id="optimizer-metrics" aria-live="polite"></div>
+        <div class="columns">
+          <article class="panel"><h3>Energy and validation</h3><div class="facts" id="run-facts"><div class="empty">Run the optimizer to see measured baseline and candidate details.</div></div>
+            <div class="section-heading compact"><div><h3>Recurring measured surplus patterns</h3></div><span id="pattern-count">—</span></div><div class="patterns" id="patterns"><div class="empty">Pattern scan has not run.</div></div></article>
+          <article class="panel"><h3>Agent feedback loop</h3><p class="panel-copy">The agent can inspect bounded evidence and write only tuning parameters to this run’s database copy. Source measurements and dispatch remain protected; the deterministic optimizer writes and validates candidate dispatch.</p><p id="decision-summary">Decision details will appear after a run.</p><details><summary>Decision log</summary><pre id="decision-log"></pre></details></article>
+        </div>
+        <details class="candidate-only"><summary>Candidate history</summary><pre id="candidate-history"></pre></details>
+      </section>
+    </main>
+
+    <section class="page" id="page-report" hidden>
+      <div class="page-heading"><p class="eyebrow">Final feedback</p><h1>Agent report</h1><p>A human-readable summary generated after the bounded optimization loop terminates.</p></div>
+      <article class="panel report-card">
+        <div class="section-heading"><div><p class="eyebrow">Run summary</p><h2 id="report-title">No completed run yet</h2></div><span id="report-source">Waiting for a run</span></div>
+        <p class="report-context">This report describes the validated optimized candidate and its stated limitations. The measured baseline is not assigned an Aleph score.</p>
+        <div class="report-content" id="report-content" role="article" aria-live="polite">Start an optimization run to receive the final agent report.</div>
+      </article>
+    </section>
+    <footer>Local prototype · synthetic dataset · candidate results must pass deterministic optimizer constraints. Battery discharge is internal energy transfer; surplus guidance is advisory and does not dispatch storage or grid export.</footer>
+  </div>
   <script src="/brain-config.js"></script>
+  <script src="/chart.umd.min.js"></script>
   <script src="/dashboard.js"></script>
 </body>
 </html>

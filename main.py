@@ -42,6 +42,7 @@ def select_agent(mode: str):
 
 def run_command(args):
     from brain_core.orchestrator import run_agentic_workflow
+    from brain_core.db_copy import create_working_copy
     db_path = Path(args.db).expanduser().resolve()
     if not db_path.is_file():
         raise SystemExit(
@@ -50,8 +51,9 @@ def run_command(args):
         )
     agent = select_agent(args.agent)
     optimizer = load_optimizer()
+    run_db = create_working_copy(db_path, f"CLI-{os.urandom(6).hex().upper()}")
     result = run_agentic_workflow(
-        str(db_path), optimizer, agent,
+        str(run_db), optimizer, agent,
         max_iterations=args.max_iterations, horizon=args.horizon,
     )
     output = {
@@ -68,6 +70,7 @@ def run_command(args):
         "energy_kwh": result["best_candidate"]["energy_kwh"],
         "surplus_allocation": result["surplus_allocation"],
         "report_source": result["report_source"],
+        "working_database": str(run_db),
     }
     print(json.dumps(output, indent=2))
     print("\n" + result["report"])
@@ -86,7 +89,10 @@ def serve_command(args):
     db_path = Path(args.db).expanduser().resolve()
     if not db_path.is_file():
         raise SystemExit(f"Database not found: {db_path}")
-    app = create_app(str(db_path), optimizer)
+    default_agent = os.getenv("AFTERHOURS_DEFAULT_AGENT", "auto").lower()
+    if default_agent not in {"auto", "mock", "gemini"}:
+        raise SystemExit("AFTERHOURS_DEFAULT_AGENT must be auto, mock, or gemini")
+    app = create_app(str(db_path), optimizer, default_agent=default_agent)
     print(f"AfterHours Brain API: http://{args.host}:{args.port}")
     print("Docs: /docs | Health: /api/health")
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")

@@ -5,6 +5,8 @@
 - `microgrid.sqlite` — the existing 7-day, 15-minute synthetic microgrid database, extended with battery degradation, flexibility verification, AI accountability and optimization tables.
 - `optimizer.py` — first executable optimization brain.
 - `schema_update_hurdle.sql` — additive SQL migration used for the new tables.
+- `schema_update_tariffs.sql` — additive tariff migration with synthetic TOU data
+  and an immutable optimization-run tariff snapshot table.
 - Existing CSV source files and variable-assessment guide.
 - `requirements.txt` — Python dependencies.
 
@@ -110,9 +112,14 @@ Illustrative run summary:
 - SOC remained between approximately 61.733% and 62.000%.
 
 The small peak reduction is the result for this particular dataset and objective
-weights, not a guaranteed performance claim. Average grid import rises slightly
-because battery round-trip losses are present; there is no tariff/energy-price model
-in this prototype.
+weights, not a guaranteed performance claim. Average grid import can rise because
+battery round-trip losses are present. The current branch adds an illustrative
+synthetic time-of-use rate term to the LP objective; this is not a verified utility
+bill or procurement tariff. Peak penalty is a demand-charge proxy (INR/kW), while
+flexibility, curtailment and expected-risk penalties are INR/kWh proxies, battery
+degradation is an estimated INR cost, and imported energy cost is INR. These units
+make the summed objective dimensionally INR, but the penalty values remain prototype
+assumptions that require project-specific calibration.
 
 ## Important model limitations — do not misrepresent these
 
@@ -133,6 +140,26 @@ This is a first operational prototype, not a field-ready controller:
   the agent's internal intent or detect every possible hallucination.
 - No real tariff is provided. Objective coefficients are explicit prototype penalty
   assumptions, not actual market prices.
+
+## Synthetic tariff demonstration
+
+Apply the additive migration from the repository root with:
+
+```bash
+python3 -c "import sqlite3; c=sqlite3.connect('microgrid_afterhours_hurdle_v1/microgrid.sqlite'); c.executescript(open('microgrid_afterhours_hurdle_v1/schema_update_tariffs.sql').read()); c.close()"
+```
+
+The seeded profile uses INR/kWh and the database's `Asia/Kolkata` timezone. Its
+all-days import rates are ₹5.50/kWh from 00:00–06:00, ₹7.00/kWh from 06:00–17:00,
+₹10.50/kWh from 17:00–22:00, and ₹7.00/kWh from 22:00–24:00. For the synthetic
+demo, export credit matches the import rate in each period (a one-to-one
+net-metering assumption). None of these values is a verified utility tariff or
+export agreement. Every boundary aligns to the source dataset's 15-minute
+intervals, and the periods partition each local day exactly once (1,440 minutes).
+The optimizer still has no export decision variable, so optimized export and
+export credit are zero; historical signed grid measurements can receive the
+configured credit in the baseline comparison. Each optimization run snapshots
+the tariff version/configuration used.
 
 ## Database safety
 

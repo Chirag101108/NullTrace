@@ -29,6 +29,8 @@ if (BRAIN_API_URL.protocol !== 'http:' || BRAIN_API_URL.hostname !== '127.0.0.1'
   throw new Error('BRAIN_API_URL must be a plain http://127.0.0.1:<port> origin.');
 }
 const BRAIN_API_ORIGIN = BRAIN_API_URL.origin;
+const DEFAULT_AGENT = ['auto', 'mock', 'gemini'].includes(process.env.AFTERHOURS_DEFAULT_AGENT)
+  ? process.env.AFTERHOURS_DEFAULT_AGENT : 'auto';
 
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, keylen: 64 };
 const SESSION_COOKIE = 'gs_session';
@@ -374,7 +376,7 @@ const server = http.createServer(async (req, res) => {
         ...SECURITY_HEADERS,
       });
       return res.end(req.method === 'HEAD' ? undefined
-        : `window.AFTERHOURS_BRAIN_API = ${JSON.stringify(BRAIN_API_ORIGIN)};\n`);
+        : `window.AFTERHOURS_BRAIN_API = ${JSON.stringify(BRAIN_API_ORIGIN)};\nwindow.AFTERHOURS_DEFAULT_AGENT = ${JSON.stringify(DEFAULT_AGENT)};\nwindow.AFTERHOURS_GEMINI_CONFIGURED = ${JSON.stringify(Boolean(process.env.GEMINI_API_KEY))};\n`);
     }
 
     if (pathname === '/api/me') {

@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import json
 import os
 import sqlite3
 import sys
@@ -47,6 +48,8 @@ from scipy.optimize import linprog
 from scipy.sparse import lil_matrix, csr_matrix
 
 
+# INR/kWh penalty proxies for reducing each flexible synthetic load. They are
+# assumptions, not measured customer interruption costs.
 FLEX_ASSETS = {
     "LOAD-BLDG-001": 1000.0,
     "LOAD-HVAC-001": 500.0,
@@ -62,7 +65,7 @@ DEFAULT_REPLACEMENT_COST = 400000.0   # illustrative INR assumption
 DEFAULT_EFC = 4000.0
 DEFAULT_NOMINAL_KWH = 120.0
 DEFAULT_PEAK_PENALTY = 1.0           # INR/kW proxy; tune with project economics
-DEFAULT_CURTAILMENT_PENALTY = 0.01   # INR/kWh proxy
+DEFAULT_CURTAILMENT_PENALTY = 0.01   # INR/kWh curtailment proxy
 DEFAULT_FLEX_RISK_PENALTY = 300.0    # INR/kWh expected shortfall proxy
 
 
@@ -167,10 +170,14 @@ def solve(conn: sqlite3.Connection, horizon: int | None = None,
           peak_penalty: float = DEFAULT_PEAK_PENALTY,
           curtailment_penalty: float = DEFAULT_CURTAILMENT_PENALTY,
           flex_risk_penalty: float = DEFAULT_FLEX_RISK_PENALTY,
-          shedding_scale: float = 1.0) -> str:
+          shedding_scale: float = 1.0,
+          tariff_rates: list[dict] | None = None,
+          tariff_snapshot: dict | None = None) -> str:
     (timestamps, loads, pv, losses, flex, confidence, capacity, initial_soc,
      battery_kw, grid_kw, cdeg, eta_c, eta_d) = _load_inputs(conn, horizon)
     n = len(timestamps)
+    if tariff_rates is not None and len(tariff_rates) != n:
+        raise ValueError("tariff_rates must contain exactly one rate record per interval")
     flex_assets = sorted(FLEX_ASSETS)
     m = len(flex_assets)
 
@@ -207,7 +214,10 @@ def solve(conn: sqlite3.Connection, horizon: int | None = None,
         c[ix("charge", t)] = cdeg * DT_H
         c[ix("discharge", t)] = cdeg * DT_H
         c[ix("curtail", t)] = curtailment_penalty * DT_H
-        c[ix("grid", t)] = 0.0
+        c[ix("grid", t)] = (
+            float(tariff_rates[t]["import_rate_per_kwh"]) * DT_H
+            if tariff_rates is not None else 0.0
+        )
         for j, asset in enumerate(flex_assets):
             demand = loads[asset][t]
             max_shed = min(demand, flex[asset][t])
@@ -291,8 +301,14 @@ def solve(conn: sqlite3.Connection, horizon: int | None = None,
         float(np.sum((1.0-confidence[a]) * shed[a])) * DT_H
         for a in flex_assets
     )
+    energy_cost_component = (
+        sum(grid[t] * DT_H * float(tariff_rates[t]["import_rate_per_kwh"])
+            for t in range(n))
+        if tariff_rates is not None else 0.0
+    )
     objective = (peak_component + shedding_component + curtail_component
-                 + degradation_component + flex_risk_component)
+                 + degradation_component + flex_risk_component
+                 + energy_cost_component)
 
     run_id = "OPT-" + uuid.uuid4().hex[:12].upper()
     now = _dt.datetime.now(_dt.timezone.utc).isoformat()
@@ -316,6 +332,16 @@ def solve(conn: sqlite3.Connection, horizon: int | None = None,
           "Linear prototype; fixed measured losses; no nonlinear AC/thermal redispatch. "
           "Synthetic flexibility proxies are not field data."))
 
+    if tariff_snapshot is not None:
+        profile = tariff_snapshot["profile"]
+        conn.execute("""
+          INSERT INTO optimization_tariff_snapshot
+          (optimization_run_id,profile_id,profile_version,currency_code,timezone,config_json,captured_at)
+          VALUES (?,?,?,?,?,?,?)
+        """, (run_id, profile["profile_id"], profile["version"],
+              profile["currency_code"], profile["timezone"],
+              tariff_snapshot["snapshot_json"], now))
+
     for t, ts in enumerate(timestamps):
         total_shed = sum(shed[a][t] for a in flex_assets)
         committed = total_shed
@@ -323,15 +349,35 @@ def solve(conn: sqlite3.Connection, horizon: int | None = None,
             (1.0-confidence[a][t])*shed[a][t] for a in flex_assets
         )
         deg_cost = cdeg * (charge[t]+discharge[t]) * DT_H
+        interval_energy_cost = (
+            grid[t] * DT_H * float(tariff_rates[t]["import_rate_per_kwh"])
+            if tariff_rates is not None else 0.0
+        )
         contrib = (peak_component / n
                    + sum(FLEX_ASSETS[a]*shed[a][t]*DT_H for a in flex_assets)
                    + curtailment_penalty*curtail[t]*DT_H
                    + deg_cost
-                   + flex_risk_penalty*expected_shortfall*DT_H)
+                   + flex_risk_penalty*expected_shortfall*DT_H
+                   + interval_energy_cost)
         conn.execute("""
           INSERT INTO optimization_result VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (run_id,ts,grid[t],charge[t],discharge[t],curtail[t],soc[t],soc[t+1],
               total_shed,committed,expected_shortfall,deg_cost,contrib))
+
+        import_kwh = grid[t] * DT_H
+        export_kwh = 0.0  # The LP has no controllable export variable.
+        import_cost = interval_energy_cost
+        conn.execute("""
+          INSERT INTO optimization_energy_cost
+          (optimization_run_id,interval_start,grid_import_kwh,grid_export_kwh,
+           import_rate_per_kwh,export_rate_per_kwh,import_cost,export_credit,net_cost,currency_code)
+          VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (run_id, ts, import_kwh, export_kwh,
+              float(tariff_rates[t]["import_rate_per_kwh"]) if tariff_rates is not None else 0.0,
+              float(tariff_rates[t]["export_rate_per_kwh"]) if tariff_rates is not None else 0.0,
+              import_cost, 0.0,
+              import_cost, tariff_snapshot["profile"]["currency_code"]
+              if tariff_snapshot is not None else "INR"))
 
         for asset in flex_assets:
             conn.execute("""

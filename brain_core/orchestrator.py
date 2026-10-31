@@ -31,6 +31,7 @@ def _fixed_reference_score(conn: sqlite3.Connection, run_id: str,
     energy = snapshot["energy_kwh"]
     curtail = energy["pv_curtailed"]
     degradation = snapshot["battery"]["estimated_degradation_cost_inr"]
+    tariff_cost = float(snapshot["cost"]["net_cost"])
     shedding = 0.0
     risk = 0.0
     rows = conn.execute("""
@@ -47,7 +48,8 @@ def _fixed_reference_score(conn: sqlite3.Connection, run_id: str,
         shedding += float(p.FLEX_ASSETS.get(asset, 0.0)) * shed_kwh
         risk += (1.0 - min(1.0, max(0.0, float(confidence)))) * shed_kwh
     return (
-        p.DEFAULT_PEAK_PENALTY * peak
+        tariff_cost
+        + p.DEFAULT_PEAK_PENALTY * peak
         + shedding
         + p.DEFAULT_CURTAILMENT_PENALTY * curtail
         + degradation
@@ -70,7 +72,8 @@ def run_agentic_workflow(db_path: str, optimizer_module, agent,
     history: list[dict[str, Any]] = []
     patterns = []
     best = None
-    best_score = float("inf")
+    best_aleph: float | None = None
+    best_reference_score = float("inf")
     stale_iterations = 0
     termination = "iteration_limit"
     decisions = []
@@ -80,6 +83,8 @@ def run_agentic_workflow(db_path: str, optimizer_module, agent,
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA foreign_keys=ON")
+        from .tariffs import ensure_tariff_schema, load_active_tariff
+        ensure_tariff_schema(conn)
         required = {
             "interval_summary", "measurement", "weather", "battery_state", "dispatch",
             "battery_degradation_model", "flexibility_declaration",
@@ -92,6 +97,12 @@ def run_agentic_workflow(db_path: str, optimizer_module, agent,
         missing = sorted(required - present)
         if missing:
             raise RuntimeError("Database is missing required hurdle tables: " + ", ".join(missing))
+        timestamps = [row[0] for row in conn.execute(
+            "SELECT interval_start FROM interval_summary ORDER BY interval_start"
+            + (" LIMIT ?" if horizon is not None else ""),
+            (horizon,) if horizon is not None else (),
+        )]
+        tariff = load_active_tariff(conn, timestamps)
         patterns = scan_surplus_patterns(conn)
         for iteration in range(1, max_iterations + 1):
             if progress_callback:
@@ -103,25 +114,46 @@ def run_agentic_workflow(db_path: str, optimizer_module, agent,
                 curtailment_penalty=params["curtailment_penalty"],
                 flex_risk_penalty=params["flex_risk_penalty"],
                 shedding_scale=params["shedding_scale"],
+                tariff_rates=tariff["rates"], tariff_snapshot=tariff,
             )
             snapshot = build_snapshot(conn, run_id)
-            score = _fixed_reference_score(conn, run_id, snapshot, optimizer_module)
-            snapshot["comparison_score_fixed_reference"] = score
+            reference_score = _fixed_reference_score(conn, run_id, snapshot, optimizer_module)
+            aleph_score = snapshot["metrics"].get("aleph_mainsys")
+            aleph_score = float(aleph_score) if aleph_score is not None else None
+            snapshot["comparison_score_fixed_reference"] = reference_score
 
-            improved = score < best_score - tolerance
+            if aleph_score is None:
+                # Some short horizons or incomplete source data cannot support
+                # every Aleph component. Keep the workflow usable without
+                # inventing or renormalizing a score; use the frozen objective
+                # only when Aleph is unavailable for all candidates.
+                improved = best_aleph is None and reference_score < best_reference_score - tolerance
+                selection_basis = "fixed_reference_fallback_aleph_unavailable"
+            else:
+                improved = (
+                    best_aleph is None or aleph_score > best_aleph + tolerance
+                    or (abs(aleph_score - best_aleph) <= tolerance
+                        and reference_score < best_reference_score - tolerance)
+                )
+                selection_basis = "aleph_then_fixed_reference_tiebreak"
             candidate_record = {
                 "iteration": iteration,
                 "optimizer_run_id": run_id,
-                "fixed_reference_score": score,
+                "aleph_score": aleph_score,
+                "selection_basis": selection_basis,
+                "fixed_reference_score": reference_score,
                 "improved_best": improved,
                 "peak_grid_import_kw": snapshot["power"]["max_grid_import_kw"],
                 "load_shed_kwh": snapshot["energy_kwh"]["load_shed"],
                 "pv_curtailed_kwh": snapshot["energy_kwh"]["pv_curtailed"],
+                "net_energy_cost": snapshot["cost"]["net_cost"],
+                "currency_code": snapshot["cost"]["currency_code"],
                 "parameters": dict(params),
             }
             history.append(candidate_record)
             if improved:
-                best_score = score
+                best_aleph = aleph_score
+                best_reference_score = reference_score
                 best = snapshot
                 stale_iterations = 0
             else:
@@ -133,7 +165,48 @@ def run_agentic_workflow(db_path: str, optimizer_module, agent,
             if progress_callback:
                 progress_callback({"stage": "agent_feedback", "iteration": iteration,
                                    "total_iterations": max_iterations})
-            raw_decision = agent.evaluate(payload)
+            if getattr(agent, "supports_database_tools", False):
+                from .agent_tools import AgentDatabaseTools
+                tools = AgentDatabaseTools(
+                    db_path, run_id, agent_run_id, iteration,
+                    allow_parameter_writes=aleph_score is not None,
+                )
+
+                def execute_agent_tool(name, arguments):
+                    if progress_callback:
+                        progress_callback({"stage": f"agent_tool:{name}",
+                                           "iteration": iteration,
+                                           "total_iterations": max_iterations})
+                    return tools.execute(name, arguments)
+
+                raw_decision = agent.evaluate(payload, tool_executor=execute_agent_tool)
+                if isinstance(raw_decision, dict):
+                    written_updates = tools.get_parameter_updates()
+                    response_updates = raw_decision.get("parameter_updates") or {}
+                    if not isinstance(response_updates, dict):
+                        raw_decision = {
+                            **raw_decision, "parameter_updates": [],
+                        }
+                    elif any(
+                        key in written_updates and
+                        (isinstance(value, bool)
+                         or not isinstance(value, (int, float))
+                         or float(value) != written_updates[key])
+                        for key, value in response_updates.items()
+                    ):
+                        raw_decision = {
+                            "action": "stop", "parameter_updates": {},
+                            "surplus_policy": None,
+                            "reason": "Rejected conflicting parameter values from tool writes and decision JSON.",
+                            "stop_reason": "conflicting_parameter_updates",
+                        }
+                    elif written_updates:
+                        raw_decision = {
+                            **raw_decision,
+                            "parameter_updates": {**response_updates, **written_updates},
+                        }
+            else:
+                raw_decision = agent.evaluate(payload)
             try:
                 decision = validate_agent_decision(raw_decision)
             except ValueError as exc:

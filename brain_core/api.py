@@ -1,26 +1,64 @@
-"""Local FastAPI interface for the microgrid brain."""
+"""Local API. Each optimization and its agent tools operate on an isolated DB copy."""
 from __future__ import annotations
+
 import json
+import os
 import sqlite3
+from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, field_validator
+
+from .aleph import ALEPH_WEIGHTS, build_run_timeseries
+from .db_copy import create_working_copy
 
 
 class RunRequest(BaseModel):
     agent: str = Field(default="auto", pattern="^(auto|gemini|mock)$")
     max_iterations: int = Field(default=3, ge=1, le=12)
     horizon: int | None = Field(default=None, ge=1, le=672)
+    gemini_api_key: str | None = Field(default=None, max_length=256, repr=False)
+
+    @field_validator("gemini_api_key")
+    @classmethod
+    def validate_gemini_api_key(cls, value: str | None) -> str | None:
+        if value == "":
+            return None
+        if value is not None and (any(ch.isspace() for ch in value)
+                                  or any(ord(ch) < 33 or ord(ch) > 126 for ch in value)):
+            raise ValueError("API key must contain printable non-whitespace ASCII characters")
+        return value
+
+    def public_request(self) -> dict:
+        """Return run metadata without the one-time credential."""
+        return self.model_dump(exclude={"gemini_api_key"})
 
 
-def create_app(db_path: str, optimizer_module):
-    app = FastAPI(title="AfterHours Microgrid Brain API", version="1.0.0")
+def create_app(db_path: str, optimizer_module, default_agent: str = "auto",
+               run_dir: str | None = None, state_db_path: str | None = None):
+    sample_path = Path(db_path).expanduser().resolve()
+    working_dir = Path(run_dir).expanduser().resolve() if run_dir else sample_path.parent / "runs"
+    control_db = (Path(state_db_path).expanduser().resolve() if state_db_path
+                  else sample_path.parent / ".afterhours-runtime" / "api-state.sqlite")
+    control_db.parent.mkdir(parents=True, exist_ok=True)
+    app = FastAPI(title="AfterHours Microgrid Brain API", version="1.1.0")
+
+    @app.exception_handler(RequestValidationError)
+    async def sanitized_validation_error(_request: Request, exc: RequestValidationError):
+        # Pydantic errors may include the submitted value. Never echo a request
+        # body because it can contain the one-time Gemini credential.
+        return JSONResponse(status_code=422, content={
+            "detail": [{"loc": error.get("loc", []), "msg": error.get("msg", "Invalid request"),
+                        "type": error.get("type", "value_error")} for error in exc.errors()]
+        })
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[],
@@ -32,111 +70,160 @@ def create_app(db_path: str, optimizer_module):
     runs: dict[str, dict] = {}
     lock = Lock()
 
+    with closing(sqlite3.connect(control_db, timeout=30)) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS brain_api_run (
+                request_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                request_json TEXT NOT NULL,
+                progress_json TEXT NOT NULL,
+                result_json TEXT,
+                error TEXT,
+                working_db_path TEXT,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(brain_api_run)")}
+        if "working_db_path" not in columns:
+            conn.execute("ALTER TABLE brain_api_run ADD COLUMN working_db_path TEXT")
+        persisted = conn.execute("""
+            SELECT request_id,status,request_json,progress_json,result_json,error,working_db_path
+            FROM brain_api_run
+        """).fetchall()
+        conn.commit()
+
+    # Preserve read access to runs created by the previous API, which stored
+    # its request journal and optimizer rows inside the sample database.
+    if sample_path.is_file():
+        try:
+            with closing(sqlite3.connect(f"{sample_path.as_uri()}?mode=ro", uri=True, timeout=5)) as legacy:
+                has_legacy_api = legacy.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='brain_api_run'"
+                ).fetchone()
+                if has_legacy_api:
+                    persisted_ids = {row[0] for row in persisted}
+                    for row in legacy.execute("""
+                        SELECT request_id,status,request_json,progress_json,result_json,error
+                        FROM brain_api_run
+                    """).fetchall():
+                        if row[0] not in persisted_ids:
+                            persisted.append((*row, str(sample_path)))
+        except sqlite3.Error:
+            pass
+
+    for request_id, status, request_json, progress_json, result_json, error, working_db_path in persisted:
+        if status in {"queued", "running"}:
+            status = "failed"
+            error = "API process restarted before this run completed."
+            progress = {**json.loads(progress_json), "stage": "failed"}
+        else:
+            progress = json.loads(progress_json)
+        runs[request_id] = {
+            "status": status, "request": json.loads(request_json),
+            "progress": progress, "error": error, "working_db_path": working_db_path,
+        }
+        if result_json:
+            runs[request_id]["result"] = json.loads(result_json)
+
     def persist(run_id: str):
         with lock:
             item = dict(runs[run_id])
-        with sqlite3.connect(db_path, timeout=30) as conn:
+        with closing(sqlite3.connect(control_db, timeout=30)) as conn:
             conn.execute("""
                 INSERT INTO brain_api_run
-                    (request_id,status,request_json,progress_json,result_json,error,updated_at)
-                VALUES (?,?,?,?,?,?,?)
+                    (request_id,status,request_json,progress_json,result_json,error,working_db_path,updated_at)
+                VALUES (?,?,?,?,?,?,?,?)
                 ON CONFLICT(request_id) DO UPDATE SET
                     status=excluded.status, request_json=excluded.request_json,
                     progress_json=excluded.progress_json, result_json=excluded.result_json,
-                    error=excluded.error, updated_at=excluded.updated_at
+                    error=excluded.error, working_db_path=excluded.working_db_path,
+                    updated_at=excluded.updated_at
             """, (
                 run_id, item["status"], json.dumps(item["request"]),
                 json.dumps(item.get("progress", {})),
                 json.dumps(item["result"]) if item.get("result") is not None else None,
-                item.get("error"), datetime.now(timezone.utc).isoformat(),
+                item.get("error"), item.get("working_db_path"),
+                datetime.now(timezone.utc).isoformat(),
             ))
+            conn.commit()
 
-    if Path(db_path).is_file():
-        with sqlite3.connect(db_path, timeout=30) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS brain_api_run (
-                    request_id TEXT PRIMARY KEY,
-                    status TEXT NOT NULL,
-                    request_json TEXT NOT NULL,
-                    progress_json TEXT NOT NULL,
-                    result_json TEXT,
-                    error TEXT,
-                    updated_at TEXT NOT NULL
-                )
-            """)
-            persisted = conn.execute("""
-                SELECT request_id,status,request_json,progress_json,result_json,error
-                FROM brain_api_run
-            """).fetchall()
-        for request_id, status, request_json, progress_json, result_json, error in persisted:
-            # A process cannot resume an in-flight optimization after restart.
-            if status in {"queued", "running"}:
-                status = "failed"
-                error = "API process restarted before this run completed."
-                progress = {**json.loads(progress_json), "stage": "failed"}
-            else:
-                progress = json.loads(progress_json)
-            runs[request_id] = {
-                "status": status,
-                "request": json.loads(request_json),
-                "progress": progress,
-                "error": error,
-            }
-            if result_json:
-                runs[request_id]["result"] = json.loads(result_json)
-        for request_id in list(runs):
-            interrupted = (
-                runs[request_id]["status"] == "failed"
-                and runs[request_id].get("error")
-                == "API process restarted before this run completed."
-            )
-            if interrupted:
-                persist(request_id)
+    # Persist interrupted requests after loading them into memory.
+    for request_id, item in list(runs.items()):
+        if item["status"] == "failed" and item.get("error") == "API process restarted before this run completed.":
+            persist(request_id)
 
-    def worker(run_id: str, request: RunRequest):
+    def worker(request_id: str, request: RunRequest):
         def update_progress(progress: dict):
             with lock:
-                runs[run_id]["progress"] = progress
-            persist(run_id)
+                runs[request_id]["progress"] = progress
+            persist(request_id)
+
         with lock:
-            runs[run_id]["status"] = "running"
-        persist(run_id)
-        from .agent import GeminiAgent, MockAgent
-        from .orchestrator import run_agentic_workflow
+            runs[request_id]["status"] = "running"
+        persist(request_id)
         try:
+            work_db = create_working_copy(sample_path, request_id, working_dir)
+            with lock:
+                runs[request_id]["working_db_path"] = str(work_db)
+            persist(request_id)
+
             mode = request.agent
+            if mode == "auto" and request.gemini_api_key:
+                mode = "gemini"
+            elif mode == "auto":
+                mode = default_agent
             if mode == "auto":
-                import os
-                mode = "gemini" if os.getenv("GEMINI_API_KEY") else "mock"
-            agent = GeminiAgent() if mode == "gemini" else MockAgent()
+                mode = "gemini" if request.gemini_api_key or os.getenv("GEMINI_API_KEY") else "mock"
+            if mode == "gemini":
+                from .agent import GeminiAgent
+                agent = GeminiAgent(api_key=request.gemini_api_key)
+            elif mode == "mock":
+                from .agent import MockAgent
+                agent = MockAgent()
+            else:
+                raise ValueError(f"Unsupported configured agent: {mode}")
+
+            from .orchestrator import run_agentic_workflow
             result = run_agentic_workflow(
-                db_path, optimizer_module, agent,
+                str(work_db), optimizer_module, agent,
                 max_iterations=request.max_iterations, horizon=request.horizon,
                 progress_callback=update_progress,
             )
             with lock:
-                runs[run_id].update({
+                runs[request_id].update({
                     "status": "completed", "result": result,
                     "progress": {"stage": "completed", "iteration": result["iterations"],
                                  "total_iterations": request.max_iterations},
                 })
-            persist(run_id)
+            persist(request_id)
         except Exception as exc:
             with lock:
-                runs[run_id].update({
+                runs[request_id].update({
                     "status": "failed",
                     "error": f"{type(exc).__name__}: {exc}",
-                    "progress": {**runs[run_id].get("progress", {}), "stage": "failed"},
+                    "progress": {**runs[request_id].get("progress", {}), "stage": "failed"},
                 })
-            persist(run_id)
+            persist(request_id)
+
+    def find_run_database(optimizer_run_id: str) -> Path:
+        with lock:
+            matches = [item.get("working_db_path") for item in runs.values()
+                       if item.get("result", {}).get("best_candidate", {}).get("run_id") == optimizer_run_id]
+        for value in matches:
+            if value and Path(value).is_file():
+                return Path(value)
+        raise HTTPException(404, "Unknown optimizer run ID")
+
+    @app.get("/api/config")
+    def config():
+        return {"default_agent": default_agent}
 
     @app.get("/api/health")
     def health():
-        path = Path(db_path)
-        if not path.is_file():
+        if not sample_path.is_file():
             return {"status": "not_ready", "database_exists": False, "database_ready": False}
         try:
-            with sqlite3.connect(db_path, timeout=5) as conn:
+            with closing(sqlite3.connect(f"{sample_path.as_uri()}?mode=ro", uri=True, timeout=5)) as conn:
                 tables = {row[0] for row in conn.execute(
                     "SELECT name FROM sqlite_master WHERE type='table'"
                 )}
@@ -147,59 +234,106 @@ def create_app(db_path: str, optimizer_module):
                 "optimization_constraint_check", "agent_run",
             }
             ready = required.issubset(tables)
-            return {
-                "status": "ok" if ready else "not_ready",
-                "database_exists": True,
-                "database_ready": ready,
-                "missing_tables": sorted(required - tables),
-            }
+            return {"status": "ok" if ready else "not_ready", "database_exists": True,
+                    "database_ready": ready, "missing_tables": sorted(required - tables),
+                    "default_agent": default_agent}
         except sqlite3.Error as exc:
             return {"status": "not_ready", "database_exists": True,
                     "database_ready": False, "error": str(exc)}
 
     @app.post("/api/run", status_code=202)
     def start_run(request: RunRequest):
-        if not Path(db_path).is_file():
-            raise HTTPException(500, "Configured microgrid database does not exist")
-        run_id = "REQ-" + uuid4().hex[:12].upper()
+        if not sample_path.is_file():
+            raise HTTPException(500, "Configured sample database does not exist")
+        effective_agent = request.agent
+        if effective_agent == "auto":
+            if request.gemini_api_key:
+                effective_agent = "gemini"
+            elif default_agent != "auto":
+                effective_agent = default_agent
+            else:
+                effective_agent = "gemini" if os.getenv("GEMINI_API_KEY") else "mock"
+        if effective_agent == "gemini" and request.max_iterations > 5:
+            raise HTTPException(
+                422,
+                "Gemini runs are limited to 5 iterations. Select 1–5 iterations or choose Mock.",
+            )
+        if effective_agent == "gemini" and not (request.gemini_api_key or os.getenv("GEMINI_API_KEY")):
+            raise HTTPException(400, "Gemini was selected but GEMINI_API_KEY is not set in the environment")
+        request_id = "REQ-" + uuid4().hex[:12].upper()
         with lock:
-            runs[run_id] = {
-                "status": "queued", "request": request.model_dump(),
+            runs[request_id] = {
+                "status": "queued", "request": request.public_request(),
                 "progress": {"stage": "queued", "iteration": 0,
                              "total_iterations": request.max_iterations},
+                "working_db_path": None,
             }
-        persist(run_id)
-        executor.submit(worker, run_id, request)
-        return {"request_id": run_id, "status": "queued"}
+        persist(request_id)
+        executor.submit(worker, request_id, request)
+        return {"request_id": request_id, "status": "queued", "agent": effective_agent}
 
-    @app.get("/api/status/{run_id}")
-    def status(run_id: str):
+    @app.get("/api/status/{request_id}")
+    def status(request_id: str):
         with lock:
-            item = runs.get(run_id)
+            item = runs.get(request_id)
             if item is None:
                 raise HTTPException(404, "Unknown request ID")
-            return {k: v for k, v in item.items() if k != "result"}
+            return {k: v for k, v in item.items() if k not in {"result", "working_db_path"}}
 
-    @app.get("/api/result/{run_id}")
-    def result(run_id: str):
+    @app.get("/api/result/{request_id}")
+    def result(request_id: str):
         with lock:
-            item = runs.get(run_id)
+            item = runs.get(request_id)
             if item is None:
                 raise HTTPException(404, "Unknown request ID")
             if item["status"] != "completed":
                 raise HTTPException(409, f"Run status is {item['status']}")
             return item["result"]
 
-    @app.get("/api/report/{run_id}")
-    def report(run_id: str):
+    @app.get("/api/report/{request_id}")
+    def report(request_id: str):
         with lock:
-            item = runs.get(run_id)
+            item = runs.get(request_id)
             if item is None:
                 raise HTTPException(404, "Unknown request ID")
             if item["status"] != "completed":
                 raise HTTPException(409, f"Run status is {item['status']}")
             return {"agent_run_id": item["result"]["agent_run_id"],
                     "report": item["result"]["report"],
-                    "report_source": item["result"]["report_source"]}
+                    "report_source": item["result"]["report_source"],
+                    "agent": item["result"]["agent"],
+                    "optimizer_run_id": item["result"]["best_candidate"]["run_id"]}
+
+    @app.get("/api/timeseries/{run_id}")
+    def timeseries(run_id: str):
+        path = find_run_database(run_id)
+        try:
+            with closing(sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True, timeout=10)) as conn:
+                data = build_run_timeseries(conn, run_id)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        return {"run_id": data["run_id"], "available": data["available"],
+                "timestamps": data["timestamps"], "units": data.get("units", {}),
+                "currency_code": data.get("currency_code"),
+                "data_quality": data.get("data_quality", "unknown"),
+                "datasets": data.get("datasets", []), "series": data.get("series", {})}
+
+    @app.get("/api/aleph/{run_id}")
+    def aleph(run_id: str):
+        path = find_run_database(run_id)
+        try:
+            with closing(sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True, timeout=10)) as conn:
+                data = build_run_timeseries(conn, run_id)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        return {"run_id": data["run_id"], "available": data["available"],
+                "timestamps": data["timestamps"], "unit": "0–100",
+                "data_quality": data.get("data_quality", "unknown"),
+                "weights": ALEPH_WEIGHTS, "score": data.get("aleph_summary", {}).get("score"),
+                "components": data.get("components", {}),
+                "summary": data.get("aleph_summary", {}),
+                "chart": {"labels": data["timestamps"],
+                          "datasets": [{"label": "Aleph", "data": data.get("aleph", []),
+                                        "unit": "0–100", "fill": True}]}}
 
     return app

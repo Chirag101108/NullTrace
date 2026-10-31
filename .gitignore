@@ -2,3 +2,7 @@ microgrid.db
 *.zip
 AfterHours_Team_Quick_Reference.txt
 */.local-data/
+grid-system-copy/node_modules/
+microgrid_afterhours_hurdle_v1/runs/
+microgrid_afterhours_hurdle_v1/.afterhours-runtime/
+*.partial

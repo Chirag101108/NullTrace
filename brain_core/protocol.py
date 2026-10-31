@@ -5,7 +5,15 @@ import json
 import sqlite3
 from typing import Any
 
+from .aleph import ALEPH_WEIGHTS, build_run_timeseries
+
 DT_H = 0.25
+OPTIMIZER_PARAMETER_BOUNDS = {
+    "peak_penalty": (0.01, 100.0),
+    "curtailment_penalty": (0.0, 1000.0),
+    "flex_risk_penalty": (0.0, 10000.0),
+    "shedding_scale": (0.0, 100.0),
+}
 
 
 def build_snapshot(conn: sqlite3.Connection, run_id: str) -> dict[str, Any]:
@@ -70,6 +78,21 @@ def build_snapshot(conn: sqlite3.Connection, run_id: str) -> dict[str, Any]:
     soc_max = max(float(r[6]) for r in rows)
     curtail_kw_peak = max(float(r[4]) for r in rows)
 
+    aleph_data = build_run_timeseries(conn, run_id)
+    cost_rows = conn.execute("""
+        SELECT SUM(import_cost),SUM(export_credit),SUM(net_cost),MAX(currency_code)
+        FROM optimization_energy_cost WHERE optimization_run_id=?
+    """, (run_id,)).fetchone()
+    cost = {
+        "import_cost": float(cost_rows[0] or 0.0),
+        "export_credit": float(cost_rows[1] or 0.0),
+        "net_cost": float(cost_rows[2] or 0.0),
+        "currency_code": cost_rows[3] or "INR",
+        "baseline_net_cost": sum(aleph_data["series"]["baseline_interval_cost"]),
+        "data_quality": aleph_data.get("data_quality", "unknown"),
+    }
+    economic_component = aleph_data.get("aleph_summary", {}).get("components", {}).get("economic_performance")
+
     return {
         "run_id": run_id,
         "status": str(run[6]),
@@ -102,9 +125,12 @@ def build_snapshot(conn: sqlite3.Connection, run_id: str) -> dict[str, Any]:
             "battery_discharge_internal": discharge,
             "pv_curtailed": curtailment,
             "external_input": external_input,
-            "grid_export": None,
+            "grid_export": 0.0,
             "unallocated_surplus": None,
+            "grid_import_cost": cost["import_cost"],
+            "grid_export_credit": cost["export_credit"],
         },
+        "cost": cost,
         "battery": {
             "charge_kwh": charge,
             "discharge_kwh": discharge,
@@ -115,14 +141,19 @@ def build_snapshot(conn: sqlite3.Connection, run_id: str) -> dict[str, Any]:
         "metrics": {
             "eta_mainsys": eta,
             "eta_mainsys_definition": "load_served_kwh / (grid_import_kwh + solar_generation_used_kwh); useful-load utilization proxy, not full export-aware system efficiency",
-            "eta_cost_mainsys": None,
-            "aleph_mainsys": None,
-            "unavailable_reason": "The supplied dataset has no tariff schedule or grid-export dispatch/measurement. Cost efficiency and aleph_mainsys cannot yet be calculated honestly.",
+            "eta_cost_mainsys": (economic_component / 100.0
+                                  if economic_component is not None else None),
+            "aleph_mainsys": aleph_data.get("aleph_summary", {}).get("score"),
+            "aleph_components": aleph_data.get("aleph_summary", {}).get("components", {}),
+            "aleph_weights": ALEPH_WEIGHTS,
+            "aleph_data_quality": cost["data_quality"],
+            "unavailable_reason": "Aleph requires all six components; missing component data is not silently reweighted.",
         },
+        "aleph": aleph_data.get("aleph_summary"),
         "limitations": [
             "Aggregate active-power scheduling with measured baseline network losses held fixed.",
             "No nonlinear AC/thermal re-solve for candidate dispatch.",
-            "No tariff schedule or grid-export decision variable.",
+            "The tariff profile is synthetic; the optimizer has no grid-export decision variable.",
             "No thermal reservoir model in the supplied hurdle database.",
             "Battery discharge is an internal transfer, not a second external energy input.",
             "Synthetic flexibility proxies are not field measurements.",
@@ -154,7 +185,8 @@ def to_agent_payload(snapshot: dict[str, Any], iteration: int, max_iterations: i
             "Do not invent measurements, tariffs, export capability, or reservoir capacity.",
             "Never propose violating physical constraints.",
             "Battery discharge is internal storage transfer, not an external energy source.",
-            "Cost efficiency and aleph are unavailable until tariff and export data exist.",
+            "Use tariff and Aleph values exactly as supplied; label the configured tariff synthetic when indicated.",
+            "The optimizer has no grid-export decision variable; do not claim it scheduled exports.",
             "Only propose changes to the four listed optimizer parameters.",
             "Return JSON matching the requested response schema.",
         ],
@@ -172,12 +204,7 @@ def validate_agent_decision(data: Any) -> dict[str, Any]:
         proposal = {}
     if not isinstance(proposal, dict):
         raise ValueError("parameter_updates must be an object")
-    allowed = {
-        "peak_penalty": (0.01, 100.0),
-        "curtailment_penalty": (0.0, 1000.0),
-        "flex_risk_penalty": (0.0, 10000.0),
-        "shedding_scale": (0.0, 100.0),
-    }
+    allowed = OPTIMIZER_PARAMETER_BOUNDS
     clean = {}
     for key, value in proposal.items():
         if key not in allowed:
