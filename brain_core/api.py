@@ -8,6 +8,8 @@ from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
+import re
+import secrets
 from threading import Lock
 from uuid import uuid4
 
@@ -25,6 +27,7 @@ class RunRequest(BaseModel):
     agent: str = Field(default="auto", pattern="^(auto|gemini|mock)$")
     max_iterations: int = Field(default=3, ge=1, le=12)
     horizon: int | None = Field(default=None, ge=1, le=672)
+    dataset_id: str = Field(default="default", pattern=r"^(default|scenario-[A-Za-z0-9_-]{1,40})$")
     gemini_api_key: str | None = Field(default=None, max_length=256, repr=False)
 
     @field_validator("gemini_api_key")
@@ -49,6 +52,12 @@ def create_app(db_path: str, optimizer_module, default_agent: str = "auto",
     control_db = (Path(state_db_path).expanduser().resolve() if state_db_path
                   else sample_path.parent / ".afterhours-runtime" / "api-state.sqlite")
     control_db.parent.mkdir(parents=True, exist_ok=True)
+    dataset_dir = control_db.parent / "datasets"
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+    from .synthetic_datasets import create_variant
+    initial_variant = dataset_dir / "scenario-default.sqlite"
+    if not initial_variant.exists():
+        create_variant(sample_path, initial_variant, "scenario-default", "Synthetic Variant 1", 41031)
     app = FastAPI(title="AfterHours Microgrid Brain API", version="1.1.0")
 
     @app.exception_handler(RequestValidationError)
@@ -152,7 +161,7 @@ def create_app(db_path: str, optimizer_module, default_agent: str = "auto",
         if item["status"] == "failed" and item.get("error") == "API process restarted before this run completed.":
             persist(request_id)
 
-    def worker(request_id: str, request: RunRequest):
+    def worker(request_id: str, request: RunRequest, source_db: Path):
         def update_progress(progress: dict):
             with lock:
                 runs[request_id]["progress"] = progress
@@ -162,7 +171,7 @@ def create_app(db_path: str, optimizer_module, default_agent: str = "auto",
             runs[request_id]["status"] = "running"
         persist(request_id)
         try:
-            work_db = create_working_copy(sample_path, request_id, working_dir)
+            work_db = create_working_copy(source_db, request_id, working_dir)
             with lock:
                 runs[request_id]["working_db_path"] = str(work_db)
             persist(request_id)
@@ -218,6 +227,52 @@ def create_app(db_path: str, optimizer_module, default_agent: str = "auto",
     def config():
         return {"default_agent": default_agent}
 
+    def list_datasets():
+        base_name = "Primary Synthetic Dataset"
+        try:
+            with closing(sqlite3.connect(f"{sample_path.as_uri()}?mode=ro", uri=True)) as conn:
+                row = conn.execute("SELECT name FROM microgrid LIMIT 1").fetchone()
+                if row and row[0]: base_name = str(row[0])
+        except sqlite3.Error:
+            pass
+        items = [{"id": "default", "name": base_name, "kind": "primary"}]
+        for path in sorted(dataset_dir.glob("scenario-*.sqlite")):
+            try:
+                with closing(sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True, timeout=3)) as conn:
+                    row = conn.execute("SELECT dataset_id,display_name,seed FROM afterhours_dataset_info LIMIT 1").fetchone()
+                    if row: items.append({"id": row[0], "name": row[1], "seed": row[2], "kind": "synthetic_variant"})
+            except sqlite3.Error:
+                continue
+        return items
+
+    def selected_dataset(dataset_id: str) -> Path:
+        if dataset_id == "default": return sample_path
+        if not re.fullmatch(r"scenario-[A-Za-z0-9_-]{1,40}", dataset_id):
+            raise HTTPException(422, "Unknown dataset selection")
+        path = dataset_dir / f"{dataset_id}.sqlite"
+        if not path.is_file(): raise HTTPException(404, "Selected dataset does not exist")
+        return path
+
+    @app.get("/api/datasets")
+    def datasets():
+        return {"datasets": list_datasets()}
+
+    @app.post("/api/datasets/randomize")
+    def randomize_dataset():
+        existing = [item for item in list_datasets() if item["kind"] == "synthetic_variant"]
+        if len(existing) >= 9:
+            raise HTTPException(409, "Dataset limit reached. Remove an unused randomized variant before generating another.")
+        dataset_id = "scenario-" + uuid4().hex[:12]
+        name = f"Randomized Synthetic Variant {len(existing) + 1}"
+        path = dataset_dir / f"{dataset_id}.sqlite"
+        try:
+            info = create_variant(sample_path, path, dataset_id, name, secrets.randbits(32))
+        except Exception as exc:
+            raise HTTPException(422, f"Could not generate a valid synthetic variant: {exc}") from exc
+        return {"dataset": {"id": dataset_id, "name": name, "kind": "synthetic_variant",
+                            "load_factor_range": info["load_factor_range"],
+                            "pv_factor_range": info["pv_factor_range"]}}
+
     @app.get("/api/health")
     def health():
         if not sample_path.is_file():
@@ -245,6 +300,7 @@ def create_app(db_path: str, optimizer_module, default_agent: str = "auto",
     def start_run(request: RunRequest):
         if not sample_path.is_file():
             raise HTTPException(500, "Configured sample database does not exist")
+        source_db = selected_dataset(request.dataset_id)
         effective_agent = request.agent
         if effective_agent == "auto":
             if request.gemini_api_key:
@@ -269,8 +325,9 @@ def create_app(db_path: str, optimizer_module, default_agent: str = "auto",
                 "working_db_path": None,
             }
         persist(request_id)
-        executor.submit(worker, request_id, request)
-        return {"request_id": request_id, "status": "queued", "agent": effective_agent}
+        executor.submit(worker, request_id, request, source_db)
+        return {"request_id": request_id, "status": "queued", "agent": effective_agent,
+                "dataset_id": request.dataset_id}
 
     @app.get("/api/status/{request_id}")
     def status(request_id: str):

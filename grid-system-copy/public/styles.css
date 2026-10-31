@@ -643,9 +643,19 @@ body:has(.app-shell) {
 .gemini-key-field { grid-column: 1 / span 2; }
 .gemini-key-field p { margin: 6px 0 0; line-height: 1.45; }
 .run-card .action-button { white-space: nowrap; }
+.dataset-controls { margin: 0 0 12px; }
+.dataset-controls label { display: block; margin-bottom: 8px; font-size: 16px; font-weight: 700; text-transform: capitalize; }
+.dataset-control-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; }
+.dataset-control-row select { min-width: 0; padding: 10px 12px; border: 1px solid #30463a; border-radius: 9px; color: #edf4ef; background: #0b1510; font: inherit; }
+.secondary-action { border: 1px solid #45613e; color: #d8f3d2; background: #14251a; }
+.dataset-controls .hint { margin: 8px 0 0; font-size: 13px; }
 .optimizer-results { margin-top: 24px; }
-.optimizer-results .columns { display: grid; grid-template-columns: 1.15fr .85fr; gap: 18px; margin-top: 18px; align-items: start; }
+.optimizer-results .columns { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin-top: 12px; align-items: stretch; }
 .optimizer-results .panel { margin: 0; border-radius: 16px; }
+.energy-validation-panel { grid-column: span 2; }
+.energy-validation-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; height: 100%; }
+.energy-validation-core,.patterns-panel { min-width: 0; }
+.patterns-panel { padding-left: 16px; border-left: 1px solid #263c31; }
 .optimizer-results .panel h3 { margin: 0 0 16px; font-size: 18px; text-transform: capitalize; }
 .optimizer-results .facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
 .optimizer-results .fact { min-width: 0; padding: 13px 14px; border-radius: 10px; background: #0b1510; }
@@ -681,6 +691,10 @@ body:has(.app-shell) {
   .gemini-key-field { grid-column: 1 / -1; }
   .run-card .action-button { width: 100%; }
   .optimizer-results .columns,.custom-graph-layout { grid-template-columns: 1fr; }
+  .energy-validation-panel { grid-column: auto; }
+  .energy-validation-layout { grid-template-columns: 1fr; }
+  .patterns-panel { padding: 16px 0 0; border-left: 0; border-top: 1px solid #263c31; }
+  .dataset-control-row { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .app-shell { width: calc(100% - 24px); padding-top: 14px; }

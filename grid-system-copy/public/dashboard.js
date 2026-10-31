@@ -47,6 +47,38 @@ async function api(path, options = {}) {
   return body;
 }
 
+async function refreshDatasetOptions(preferredId) {
+  const result = await api('/api/datasets');
+  const select = $('dataset-select');
+  const previous = preferredId || select.value || 'default';
+  select.replaceChildren();
+  for (const dataset of result.datasets || []) {
+    const option = document.createElement('option');
+    option.value = dataset.id;
+    option.textContent = dataset.name;
+    select.append(option);
+  }
+  select.value = (result.datasets || []).some((item) => item.id === previous) ? previous : 'default';
+}
+
+$('randomize-dataset').addEventListener('click', async () => {
+  const button = $('randomize-dataset');
+  button.disabled = true;
+  button.textContent = 'Generating…';
+  try {
+    const result = await api('/api/datasets/randomize', { method: 'POST' });
+    await refreshDatasetOptions(result.dataset.id);
+    $('dataset-note').textContent = `Created ${result.dataset.name}: daily load and PV are each varied by ±5%; feeder flows and losses were recalculated. The primary dataset is unchanged.`;
+  } catch (error) {
+    $('dataset-note').textContent = error.message || 'Could not generate a valid randomized dataset.';
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Generate Random Variant';
+  }
+});
+
+refreshDatasetOptions().catch((error) => { $('dataset-note').textContent = `Dataset list unavailable: ${error.message}`; });
+
 function setStatus(message, kind = '') {
   const node = $('run-status');
   node.textContent = message;
@@ -505,7 +537,7 @@ $('run-button').addEventListener('click', async () => {
   button.textContent = 'Running…';
   setStatus('Submitting optimization…');
   try {
-    const request = { agent: $('agent').value, max_iterations: Number($('iterations').value) };
+    const request = { agent: $('agent').value, max_iterations: Number($('iterations').value), dataset_id: $('dataset-select').value || 'default' };
     if (manualGeminiApiKey && request.agent !== 'mock') {
       request.gemini_api_key = manualGeminiApiKey;
     }

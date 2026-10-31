@@ -115,6 +115,11 @@
 
     <main class="page" id="page-optimizer" hidden>
       <div class="page-heading"><p class="eyebrow">AfterHours prototype</p><h1>Microgrid run console</h1><p>Run the deterministic scheduler with an optional bounded AI feedback loop. Physical dispatch and constraint checks stay with the optimizer.</p></div>
+      <section class="dataset-controls panel" aria-label="Synthetic dataset selection">
+        <label for="dataset-select">Synthetic Dataset</label>
+        <div class="dataset-control-row"><select id="dataset-select"><option value="default">Loading datasets…</option></select><button class="action-button secondary-action" id="randomize-dataset" type="button">Generate Random Variant</button></div>
+        <p class="hint" id="dataset-note" aria-live="polite">Random variants use bounded daily load and solar profile adjustments. Existing datasets remain unchanged.</p>
+      </section>
       <section class="run-card" aria-label="Run configuration">
         <label>Decision agent<select id="agent"><option value="auto">Auto · Gemini if configured</option><option value="mock">Offline mock</option><option value="gemini">Gemini API</option></select></label>
         <label>Maximum Iterations <span class="hint" id="iteration-limit-hint">Mock: up to 12 · Gemini: up to 5</span><select id="iterations"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>12</option></select></label>
@@ -135,8 +140,10 @@
         <p class="view-caption">Current View: <strong class="current-view-label">Before · Measured Baseline</strong></p>
         <div class="metrics-grid" id="optimizer-metrics" aria-live="polite"></div>
         <div class="columns">
-          <article class="panel"><h3>Energy and validation</h3><div class="facts" id="run-facts"><div class="empty">Run the optimizer to see measured baseline and candidate details.</div></div>
-            <div class="section-heading compact"><div><h3>Recurring measured surplus patterns</h3></div><span id="pattern-count">—</span></div><div class="patterns" id="patterns"><div class="empty">Pattern scan has not run.</div></div></article>
+          <article class="panel energy-validation-panel"><div class="energy-validation-layout">
+            <section class="energy-validation-core"><h3>Energy and validation</h3><div class="facts" id="run-facts"><div class="empty">Run the optimizer to see measured baseline and candidate details.</div></div></section>
+            <section class="patterns-panel"><div class="section-heading compact"><div><h3>Recurring measured surplus patterns</h3></div><span id="pattern-count">—</span></div><div class="patterns" id="patterns"><div class="empty">Pattern scan has not run.</div></div></section>
+          </div></article>
           <article class="panel"><h3>Agent feedback loop</h3><p class="panel-copy">The agent can inspect bounded evidence and write only tuning parameters to this run’s database copy. Source measurements and dispatch remain protected; the deterministic optimizer writes and validates candidate dispatch.</p><p id="decision-summary">Decision details will appear after a run.</p><details><summary>Decision log</summary><pre id="decision-log"></pre></details></article>
         </div>
         <details class="candidate-only"><summary>Candidate history</summary><pre id="candidate-history"></pre></details>
