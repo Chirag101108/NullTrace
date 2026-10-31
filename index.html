@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#09120f">
-  <title>Grid System · Microgrid Brain</title>
+  <title>AfterHours · Microgrid Control</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -64,13 +65,28 @@
     .fact strong { display: block; margin-top: 6px; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
     .report { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 420px; overflow: auto; margin: 0; color: #d7e2da; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .empty { padding: 25px 16px; border: 1px dashed #344a3d; border-radius: 12px; color: var(--muted); text-align: center; font-size: 12px; line-height: 1.6; }
+    .nav { display:flex; gap:8px; padding:18px 0 0; }
+    .nav button { border:1px solid var(--line); border-radius:999px; padding:9px 16px; color:var(--muted); background:#0b1510; cursor:pointer; }
+    .nav button[aria-current="page"] { color:#0b160e; background:var(--green); border-color:var(--green); font-weight:750; }
+    .page { padding-top:30px; }
+    .hero { padding:clamp(24px,5vw,56px); border:1px solid var(--line); border-radius:20px; background:linear-gradient(120deg,#14251a,#101b16 65%,#18271b); }
+    .hero h2 { max-width:700px; font-size:clamp(34px,6vw,58px); }
+    .hero p { max-width:650px; color:var(--muted); line-height:1.7; }
+    .quick-links { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:18px; }
+    .quick-link { display:block; padding:20px; border:1px solid var(--line); border-radius:15px; color:inherit; background:var(--panel); text-decoration:none; }
+    .quick-link strong { display:block; margin-bottom:7px; color:var(--green); }
+    .quick-link span,.hint { color:var(--muted); font-size:12px; line-height:1.6; }
+    .graph-layout { display:grid; grid-template-columns:minmax(280px,.8fr) minmax(0,1.5fr); gap:14px; align-items:start; }
+    .json-input { min-height:300px; width:100%; padding:14px; border:1px solid #30463a; border-radius:10px; outline:0; color:#edf4ef; background:#0b1510; font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; resize:vertical; }
+    .chart-wrap { position:relative; min-height:360px; }
+    [hidden] { display:none !important; }
     .patterns { display: grid; gap: 9px; }
     .pattern { padding: 11px 12px; border-radius: 10px; background: #0b1510; }
     .pattern strong { display: block; font-size: 12px; }
     .pattern span { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; }
     footer { margin-top: 25px; color: #718478; font-size: 11px; line-height: 1.6; text-align: center; }
-    @media (max-width: 820px) { .run-card { grid-template-columns: 1fr 1fr; } .metrics { grid-template-columns: repeat(2, 1fr); } .columns { grid-template-columns: 1fr; } }
-    @media (max-width: 520px) { .shell { width: min(100% - 24px, 1280px); padding-top: 14px; } header { align-items: flex-start; } .intro { display: block; } .run-card { grid-template-columns: 1fr; } .run-button { width: 100%; } .metrics { gap: 8px; } .metric { min-height: 94px; padding: 12px; } .metric strong { font-size: 20px; } .connection { font-size: 0; } }
+    @media (max-width: 820px) { .run-card { grid-template-columns: 1fr 1fr; } .metrics { grid-template-columns: repeat(2, 1fr); } .columns,.graph-layout { grid-template-columns: 1fr; } }
+    @media (max-width: 520px) { .shell { width: min(100% - 24px, 1280px); padding-top: 14px; } header { align-items: flex-start; } .intro { display: block; } .run-card { grid-template-columns: 1fr; } .run-button { width: 100%; } .metrics,.quick-links { grid-template-columns:1fr 1fr; gap: 8px; } .metric { min-height: 94px; padding: 12px; } .metric strong { font-size: 20px; } .connection { font-size: 0; } .nav { gap:5px; } .nav button { padding:8px 11px; } }
   </style>
 </head>
 <body>
@@ -83,7 +99,40 @@
       <div class="connection" aria-live="polite"><span class="lamp" id="health-lamp"></span><span id="health-label">Checking local API…</span></div>
     </header>
 
-    <main>
+    <nav class="nav" aria-label="Main navigation">
+      <button type="button" data-page="home" aria-current="page">Home</button>
+      <button type="button" data-page="graph">Graph</button>
+      <button type="button" data-page="optimizer">Optimizer</button>
+    </nav>
+
+    <section class="page" id="page-home">
+      <div class="hero">
+        <div class="eyebrow">AfterHours · microgrid intelligence</div>
+        <h2>See your energy system clearly.</h2>
+        <p>Explore system data, inspect trends, and run a constraint-checked microgrid optimization from one workspace.</p>
+        <div class="quick-links">
+          <a class="quick-link" href="#graph" data-link-page="graph"><strong>01 · Graph</strong><span>Paste JSON data and turn it into an interactive Chart.js graph.</span></a>
+          <a class="quick-link" href="#optimizer" data-link-page="optimizer"><strong>02 · Optimizer</strong><span>Run the local scheduler and review validated dispatch results.</span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-graph" hidden>
+      <div class="intro"><div><div class="eyebrow">Data explorer</div><h2>Graph your JSON</h2><p>Paste a Chart.js data object with labels and datasets. Choose a chart style, then render it below.</p></div></div>
+      <div class="graph-layout">
+        <article class="panel">
+          <label for="chart-type">Chart type</label><select id="chart-type"><option value="line">Line</option><option value="bar">Bar</option></select>
+          <label for="json-data" style="margin-top:16px">JSON input</label>
+          <textarea class="json-input" id="json-data" spellcheck="false" aria-describedby="json-hint"></textarea>
+          <p class="hint" id="json-hint">Expected format: { "labels": ["00:00", "01:00"], "datasets": [{ "label": "Load", "data": [12, 18] }] }</p>
+          <button class="run-button" id="draw-chart" type="button">Render graph →</button>
+          <div class="notice" id="graph-notice" role="status" aria-live="polite"></div>
+        </article>
+        <article class="panel"><h3>Chart preview</h3><div class="chart-wrap"><canvas id="data-chart" aria-label="Graph of provided JSON data"></canvas></div></article>
+      </div>
+    </section>
+
+    <main class="page" id="page-optimizer" hidden>
       <section class="intro">
         <div><div class="eyebrow">AfterHours prototype</div><h2>Microgrid run console</h2><p>Run the deterministic scheduler with an optional bounded AI feedback loop. Physical dispatch and constraint checks stay with the optimizer.</p></div>
       </section>
@@ -124,6 +173,41 @@
 
   <script>
     (() => {
+      const pageButtons = [...document.querySelectorAll('[data-page]')];
+      function showPage(name) {
+        for (const button of pageButtons) {
+          const active = button.dataset.page === name;
+          button.toggleAttribute('aria-current', active);
+          if (active) button.setAttribute('aria-current', 'page');
+        }
+        for (const page of document.querySelectorAll('.page[id^="page-"]')) page.hidden = page.id !== `page-${name}`;
+        location.hash = name;
+        document.title = `${name[0].toUpperCase()}${name.slice(1)} · AfterHours`;
+        if (name === 'graph' && window.dataChart) window.dataChart.resize();
+      }
+      pageButtons.forEach((button) => button.addEventListener('click', () => showPage(button.dataset.page)));
+      document.querySelectorAll('[data-link-page]').forEach((link) => link.addEventListener('click', (event) => { event.preventDefault(); showPage(link.dataset.linkPage); }));
+      const initialPage = ['home', 'graph', 'optimizer'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'home';
+      showPage(initialPage);
+
+      const jsonInput = document.getElementById('json-data');
+      if (jsonInput) {
+        jsonInput.value = JSON.stringify({ labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'], datasets: [{ label: 'Load (kW)', data: [18, 19, 28, 43, 47, 36], borderColor: '#83e65e', backgroundColor: 'rgba(131,230,94,.15)', tension: .35, fill: true }] }, null, 2);
+        document.getElementById('draw-chart').addEventListener('click', () => {
+          const notice = document.getElementById('graph-notice');
+          try {
+            const data = JSON.parse(jsonInput.value);
+            if (!data || !Array.isArray(data.labels) || !Array.isArray(data.datasets) || !data.datasets.length || data.datasets.some((set) => !Array.isArray(set.data) || set.data.length !== data.labels.length || set.data.some((value) => !Number.isFinite(Number(value))))) throw new Error('Use labels and at least one dataset with a numeric data value for each label.');
+            if (!window.Chart) throw new Error('Chart.js did not load. Check your internet connection and reload.');
+            if (window.dataChart) window.dataChart.destroy();
+            const palette = ['#83e65e', '#efc56d', '#72b8ff', '#f08c7f', '#bf9bff'];
+            window.dataChart = new Chart(document.getElementById('data-chart'), { type: document.getElementById('chart-type').value, data: { labels: data.labels, datasets: data.datasets.map((set, index) => ({ ...set, borderColor: set.borderColor || palette[index % palette.length], backgroundColor: set.backgroundColor || `${palette[index % palette.length]}33`, tension: set.tension ?? .3 })) }, options: { responsive: true, maintainAspectRatio: false, interaction: { intersect: false, mode: 'index' }, plugins: { legend: { labels: { color: '#c5d2c9' } } }, scales: { x: { ticks: { color: '#9aaea2' }, grid: { color: '#263c31' } }, y: { ticks: { color: '#9aaea2' }, grid: { color: '#263c31' } } } } });
+            notice.textContent = `Rendered ${data.datasets.length} dataset(s) across ${data.labels.length} labels.`;
+            notice.className = 'notice success';
+          } catch (error) { notice.textContent = error.message; notice.className = 'notice error'; }
+        });
+        document.getElementById('draw-chart').click();
+      }
       const API_BASE = new URLSearchParams(location.search).get('api') || 'http://127.0.0.1:8765';
       const $ = (id) => document.getElementById(id);
       const button = $('run-button');
